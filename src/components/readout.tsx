@@ -4,6 +4,7 @@
 
 import { DisplayState } from '../core/types';
 import { Unit, compassLabel, convert, unitLabel } from '../core/units';
+import { ChipView } from '../state/locationChip';
 
 interface Props {
   state: DisplayState;
@@ -65,14 +66,63 @@ export function AccuracyChip({ state }: { state: DisplayState }) {
   );
 }
 
-export function FixBanner({ state }: { state: DisplayState }) {
-  if (!state.showNoFix) return null;
+/**
+ * The fix-area chip (SPEC M1-O7). One slot, four honest states — LOCATION
+ * NEEDED / LOCATION DENIED / LOCATION OFF / SEARCHING / SIGNAL LOST — instead
+ * of the old generic NO FIX. The never-fake-0.0 rule is unchanged: this chip
+ * only describes the chain, the readout still freezes the last good speed.
+ */
+const CHIP_TONE: Record<string, string> = {
+  LOCATION_NEEDED: 'bg-sky-700 text-white',
+  LOCATION_DENIED: 'bg-red-700 text-white',
+  LOCATION_OFF: 'bg-amber-600 text-black',
+  SEARCHING: 'bg-neutral-800 text-sky-200',
+  SIGNAL_LOST: 'bg-amber-600 text-black',
+  NONE: '',
+};
+
+const ACTION_LABEL: Record<string, string> = {
+  allow: 'Allow',
+  retry: 'Retry',
+  recheck: 'Re-check',
+};
+
+export function FixBanner({
+  state,
+  chip,
+  onAction,
+}: {
+  state: DisplayState;
+  chip: ChipView;
+  onAction?: () => void;
+}) {
+  if (chip.state === 'NONE' || chip.label === null) return null;
   return (
     <div
-      className="rounded-md bg-amber-600 px-4 py-2 text-center font-semibold text-black"
+      className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-md px-4 py-2 text-center font-semibold ${CHIP_TONE[chip.state] ?? 'bg-amber-600 text-black'}`}
       data-testid="fix-banner"
+      data-chip={chip.state}
     >
-      NO FIX {state.fixState === 'LOST' ? '— SIGNAL LOST' : ''}
+      <span className="min-w-0 break-words">{chip.label}</span>
+      {chip.hint ? (
+        <span className="min-w-0 basis-full text-xs font-normal opacity-90 sm:basis-auto">
+          {chip.hint}
+        </span>
+      ) : null}
+      {chip.action !== null && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="min-h-11 shrink-0 rounded-full bg-white/95 px-4 text-sm font-bold text-neutral-900 active:bg-white"
+          data-testid={`chip-action-${chip.action}`}
+        >
+          {ACTION_LABEL[chip.action]}
+        </button>
+      ) : null}
+      {/* `state` keeps the banner part of the display-state contract (M1-O7). */}
+      <span className="sr-only" data-testid="fix-state">
+        {state.fixState}
+      </span>
     </div>
   );
 }

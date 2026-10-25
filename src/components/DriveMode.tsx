@@ -32,7 +32,7 @@ export function DriveMode({ vm }: Props) {
         </div>
       </div>
 
-      <FixBanner state={vm.state} />
+      <FixBanner state={vm.state} chip={vm.chip} onAction={vm.allowLocation} />
 
       <DebugOverlay vm={vm} />
     </div>
@@ -41,6 +41,13 @@ export function DriveMode({ vm }: Props) {
 
 function DebugOverlay({ vm }: { vm: SpeedViewModel }) {
   const d = vm.debug;
+  const l = vm.location;
+  const permission =
+    l.permission === 'granted'
+      ? l.precise
+        ? 'granted (precise)'
+        : 'granted (approximate)'
+      : l.permission;
   return (
     <div
       className="mt-auto rounded-lg bg-neutral-900 p-3 font-mono text-xs text-neutral-400"
@@ -58,6 +65,19 @@ function DebugOverlay({ vm }: { vm: SpeedViewModel }) {
         {d.lastIntervalMs === null ? 'n/a' : `${Math.round(d.lastIntervalMs)} ms`}
       </div>
       <div>stationary: {String(vm.state.isStationary)}</div>
+      {/* Location-chain health (SPEC M1-O7): the next device test self-diagnoses. */}
+      <div>permission: {permission}</div>
+      <div>
+        provider:{' '}
+        {l.providerEnabled === null ? 'unknown' : l.providerEnabled ? 'on' : 'off'}
+      </div>
+      <div>watch: {l.watchActive ? 'active' : 'inactive'}</div>
+      <div>
+        last error:{' '}
+        {l.lastErrorCode === null
+          ? 'none'
+          : `${l.lastErrorCode}${l.lastErrorMessage ? ` — ${l.lastErrorMessage}` : ''}`}
+      </div>
       {vm.error ? <div className="text-red-400">error: {vm.error}</div> : null}
     </div>
   );

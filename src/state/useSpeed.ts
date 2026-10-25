@@ -9,7 +9,8 @@ import { SpeedProcessor } from '../core/pipeline';
 import { DisplayState, RawFix } from '../core/types';
 import { Unit } from '../core/units';
 import { ScreenLock } from '../platform/ScreenLock';
-import { SpeedSource } from '../platform/SpeedSource';
+import { SourceDiagnostics, SpeedSource } from '../platform/SpeedSource';
+import { ChipView, chipFor } from './locationChip';
 
 export type DriveMode = 'drive' | 'hud';
 
@@ -29,6 +30,12 @@ export interface SpeedViewModel {
   error: string | null;
   /** Debug instrumentation (SPEC O4): last raw speed, accepted-fix count, fix interval. */
   debug: VmDebug;
+  /** Chain health (SPEC M1-O7): permission, provider, watch, last error. */
+  location: SourceDiagnostics;
+  /** The one chip this state shows in the fix-age area (M1-O7). */
+  chip: ChipView;
+  /** Runs the permission request / chain re-check behind the chip's button. */
+  allowLocation: () => void;
 }
 
 const NS_PER_MS = 1_000_000;
@@ -51,11 +58,22 @@ export function useSpeed(
   const [unit, setUnit] = useState<Unit>(opts?.unit ?? 'kmh');
   const [mode, setMode] = useState<DriveMode>(opts?.mode ?? 'drive');
   const [error, setError] = useState<string | null>(null);
+  const [location, setLocation] = useState<SourceDiagnostics>(() =>
+    source.diagnostics(),
+  );
   const [debug, setDebug] = useState<VmDebug>({
     rawSpeedMps: null,
     fixCount: 0,
     lastIntervalMs: null,
   });
+
+  // Chain health (permission / provider / watch / last error) is pushed by the
+  // source; the chip and the overlay read it (SPEC M1-O7).
+  useEffect(() => source.onDiagnostics(setLocation), [source]);
+
+  const allowLocation = useCallback(() => {
+    void source.requestPermission();
+  }, [source]);
 
   const nowNs = useCallback((): bigint => {
     return BigInt(Math.round(performance.now() * NS_PER_MS));
@@ -122,6 +140,15 @@ export function useSpeed(
     };
   }, [screenLock]);
 
+  const chip: ChipView = chipFor({
+    permission: location.permission,
+    providerEnabled: location.providerEnabled,
+    watchActive: location.watchActive,
+    lastErrorCode: location.lastErrorCode,
+    fixState: state.fixState,
+    fixAgeMs: state.fixAgeMs,
+  });
+
   return {
     state,
     unit,
@@ -130,5 +157,8 @@ export function useSpeed(
     setMode,
     error,
     debug,
+    location,
+    chip,
+    allowLocation,
   };
 }

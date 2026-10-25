@@ -25,7 +25,7 @@ export function HudMode({ vm }: Props) {
       </div>
       <div className="flex flex-col items-center gap-2">
         <StationaryChip state={vm.state} />
-        <FixBanner state={vm.state} />
+        <FixBanner state={vm.state} chip={vm.chip} onAction={vm.allowLocation} />
       </div>
     </div>
   );
