@@ -32,3 +32,9 @@ The owner removed all persistence. DualDash now requests location permission, sh
 - **Kept.** Full GPS pipeline (`src/core`), `SpeedSource` seam + geolocation plugin, `ScreenLock`/keep-awake, Drive and HUD modes, mode toggle, fix-age chip, debug overlay.
 - **Docs.** SPEC records M1-O5, marks M1-O2 superseded, and drops the Turso-sync milestone from Next steps.
 - **Tests.** 40 → 35 (one trip-recorder file removed; all remaining suites pass).
+
+### Build — Android toolchain + debug APK (2026-10-25)
+
+- **Toolchain.** The VPS now carries Temurin JDK 21.0.13+9 (publisher sha256 verified) at `~/tools/jdk-21` and the Android SDK at `~/Android/Sdk`: command-line tools 13114758, platform-tools 37.0.1, `platforms;android-36`, `build-tools;35.0.0` and `build-tools;36.0.0`. All SDK licenses are accepted.
+- **Debug APK.** `./gradlew assembleDebug` exits 0 on master `9f1b82f` (realtime-only strip). Output: `android/app/build/outputs/apk/debug/app-debug.apk` — 11,338,007 bytes, sha256 `0a41ad96448ee9a7abc48a260600936beeee1a35307dfddd784be603f47e9a08`.
+- **Bundle check.** The APK embeds `assets/public/assets/index-C3EVWk45.js`, which is the fresh Vite output hash at build time, so the APK carries the current code.
