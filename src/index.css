@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+/* Mobile-first base: prevent horizontal scroll and size the viewport. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0a0a0a;
+  color: #fff;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
+/* Tabular numerals stop the big readout from jittering as digits change. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
