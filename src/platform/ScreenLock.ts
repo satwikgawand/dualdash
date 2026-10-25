@@ -1,4 +1,5 @@
-// ScreenLock seam. Drive mode and HUD mode keep the screen on during a trip.
+// ScreenLock seam. Drive mode and HUD mode keep the screen on while the app
+// shows realtime data (SPEC M1-O5: nothing is recorded or stored).
 // Device impl uses @capacitor-community/keep-awake; the web impl falls back to
 // the Screen Wake Lock API (Baseline 2025) when running in a plain browser PWA.
 

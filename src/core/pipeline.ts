@@ -200,12 +200,12 @@ export class SpeedProcessor {
     this.confidence = 'live';
   }
 
-  /** Expose for trip recorder: the last accepted fix (may be speed-rejected). */
+  /** Last accepted fix (may be speed-rejected). */
   lastFix(): RawFix | null {
     return this.lastRaw;
   }
 
-  /** Expose the smoothed display speed in m/s (for trip avg/max accumulation). */
+  /** Smoothed display speed in m/s. */
   smoothedSpeed(): number {
     return this.smoothedMps;
   }

@@ -27,11 +27,6 @@ export function HudMode({ vm }: Props) {
         <StationaryChip state={vm.state} />
         <FixBanner state={vm.state} />
       </div>
-      {vm.tripRunning ? (
-        <div className="text-center text-sm text-neutral-500" data-testid="hud-trip-dot">
-          ● REC
-        </div>
-      ) : null}
     </div>
   );
 }

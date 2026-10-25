@@ -1,7 +1,8 @@
-// Drive mode: the glanceable dashboard. Huge primary speed, trip counters,
-// accuracy chip, unit + mode toggles, trip start/stop. Mobile-first, >=44px
-// targets, no horizontal scroll. The debug overlay (SPEC O4) carries the
-// drive-test instrumentation: raw vs smoothed speed, fix state, fix interval.
+// Drive mode: the glanceable dashboard. Huge primary speed, accuracy chip,
+// unit + mode toggles. Realtime-only: no counters, no controls that persist
+// anything (SPEC M1-O5). Mobile-first, >=44px targets, no horizontal scroll.
+// The debug overlay (SPEC O4) carries the drive-test instrumentation:
+// raw vs smoothed speed, fix state, fix interval.
 
 import { SpeedViewModel } from '../state/useSpeed';
 import {
@@ -11,7 +12,6 @@ import {
   SpeedReadout,
   StationaryChip,
 } from './readout';
-import { TripPanel } from './TripPanel';
 import { ToggleBar } from './ToggleBar';
 
 interface Props {
@@ -33,8 +33,6 @@ export function DriveMode({ vm }: Props) {
       </div>
 
       <FixBanner state={vm.state} />
-
-      <TripPanel vm={vm} />
 
       <DebugOverlay vm={vm} />
     </div>

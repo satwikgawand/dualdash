@@ -13,7 +13,6 @@ import {
   ScreenLock,
   WebScreenLock,
 } from './platform/ScreenLock';
-import { IndexedDbTripStore } from './platform/indexedDbTripStore';
 import { SpeedSource } from './platform/SpeedSource';
 import './index.css';
 
@@ -64,7 +63,6 @@ root.render(
     <App
       source={pickSource()}
       screenLock={pickScreenLock()}
-      tripStore={new IndexedDbTripStore()}
     />
   </StrictMode>,
 );

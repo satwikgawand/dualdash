@@ -1,16 +1,15 @@
 // useSpeed: the single data layer both Drive and HUD modes render from.
 // Wires SpeedSource -> SpeedProcessor -> React state, with a rAF tick so
-// staleness progresses even when fixes stop arriving (tunnel). Also owns the
-// trip recorder, keep-awake, and trip persistence through the seams.
+// staleness progresses even when fixes stop arriving (tunnel). Also owns
+// keep-awake while the app shows realtime data. Nothing is persisted: the
+// view model lives in component memory only (SPEC M1-O5, realtime-only).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SpeedProcessor } from '../core/pipeline';
-import { TripRecorder, TripSummary } from '../core/tripRecorder';
 import { DisplayState, RawFix } from '../core/types';
 import { Unit } from '../core/units';
 import { ScreenLock } from '../platform/ScreenLock';
 import { SpeedSource } from '../platform/SpeedSource';
-import { StoredTrip, TripStore } from '../platform/TripStore';
 
 export type DriveMode = 'drive' | 'hud';
 
@@ -27,11 +26,6 @@ export interface SpeedViewModel {
   setUnit: (u: Unit) => void;
   mode: DriveMode;
   setMode: (m: DriveMode) => void;
-  tripRunning: boolean;
-  tripSummary: TripSummary;
-  trips: StoredTrip[];
-  startTrip: () => void;
-  stopTrip: () => void;
   error: string | null;
   /** Debug instrumentation (SPEC O4): last raw speed, accepted-fix count, fix interval. */
   debug: VmDebug;
@@ -39,24 +33,12 @@ export interface SpeedViewModel {
 
 const NS_PER_MS = 1_000_000;
 
-const EMPTY_SUMMARY: TripSummary = {
-  distanceM: 0,
-  elapsedMs: 0,
-  avgSpeedMps: 0,
-  maxSpeedMps: 0,
-  startedAtMs: null,
-  endedAtMs: null,
-  samples: 0,
-};
-
 export function useSpeed(
   source: SpeedSource,
   screenLock: ScreenLock,
-  tripStore: TripStore,
   opts?: { unit?: Unit; mode?: DriveMode },
 ): SpeedViewModel {
   const processorRef = useRef(new SpeedProcessor());
-  const recorderRef = useRef(new TripRecorder());
   const anchorRef = useRef<number>(0); // performance.now() anchor for monotonic ns
   const lastFixNsRef = useRef<bigint | null>(null);
   const rawSpeedRef = useRef<number | null>(null);
@@ -68,9 +50,6 @@ export function useSpeed(
   );
   const [unit, setUnit] = useState<Unit>(opts?.unit ?? 'kmh');
   const [mode, setMode] = useState<DriveMode>(opts?.mode ?? 'drive');
-  const [tripRunning, setTripRunning] = useState(false);
-  const [tripSummary, setTripSummary] = useState<TripSummary>(EMPTY_SUMMARY);
-  const [trips, setTrips] = useState<StoredTrip[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<VmDebug>({
     rawSpeedMps: null,
@@ -82,7 +61,7 @@ export function useSpeed(
     return BigInt(Math.round(performance.now() * NS_PER_MS));
   }, []);
 
-  // Handle one raw fix: feed processor, feed recorder, refresh state.
+  // Handle one raw fix: feed processor, refresh state.
   const handleFix = useCallback(
     (fix: RawFix) => {
       const proc = processorRef.current;
@@ -94,11 +73,6 @@ export function useSpeed(
         lastIntervalRef.current = Number(fix.elapsedRealtimeNanos - lastFixNsRef.current) / 1e9 * 1000;
       }
       lastFixNsRef.current = fix.elapsedRealtimeNanos;
-
-      if (recorderRef.current.isRunning()) {
-        recorderRef.current.addFix(fix, proc.smoothedSpeed(), performance.now());
-        setTripSummary(recorderRef.current.summary(performance.now()));
-      }
 
       setState(proc.getSnapshot(nowNs()));
       setDebug({
@@ -140,27 +114,13 @@ export function useSpeed(
     };
   }, [source, handleFix, nowNs]);
 
-  // Load stored trips once.
+  // Keep the screen on while the app shows realtime data; release on unmount.
   useEffect(() => {
-    tripStore.list().then(setTrips).catch(() => setTrips([]));
-  }, [tripStore]);
-
-  const startTrip = useCallback(() => {
-    recorderRef.current.start(performance.now());
-    setTripRunning(true);
-    setTripSummary(recorderRef.current.summary(performance.now()));
-    void screenLock.request(); // keep-awake while a trip is active
+    void screenLock.request();
+    return () => {
+      void screenLock.release();
+    };
   }, [screenLock]);
-
-  const stopTrip = useCallback(() => {
-    const summary = recorderRef.current.stop(performance.now());
-    setTripRunning(false);
-    setTripSummary(summary);
-    void screenLock.release();
-    tripStore.save(summary).then((stored) => {
-      setTrips((prev) => [stored, ...prev]);
-    }).catch(() => setTrips([]));
-  }, [screenLock, tripStore]);
 
   return {
     state,
@@ -168,11 +128,6 @@ export function useSpeed(
     setUnit,
     mode,
     setMode,
-    tripRunning,
-    tripSummary,
-    trips,
-    startTrip,
-    stopTrip,
     error,
     debug,
   };

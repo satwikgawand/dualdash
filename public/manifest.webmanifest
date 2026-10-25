@@ -1,7 +1,7 @@
 {
   "name": "DualDash",
   "short_name": "DualDash",
-  "description": "Standalone GPS car speed HUD with trip logging. No OBD dongle.",
+  "description": "Standalone GPS car speed HUD. Realtime-only, no stored data. No OBD dongle.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
