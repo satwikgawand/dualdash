@@ -2,17 +2,117 @@
 // "one data layer, two screens" contract: the same component tree renders from
 // the same DisplayState; HUD mode only adds a CSS mirror transform + palette.
 
+import { useEffect, useState } from 'react';
+
 import { DisplayState } from '../core/types';
-import { Unit, compassLabel, convert, unitLabel } from '../core/units';
+import { Unit, compassLabel, unitLabel } from '../core/units';
 import { ChipView } from '../state/locationChip';
+import { digitTransition, roundSpeed, speedDigitSlots } from './speedRoll';
 
 interface Props {
   state: DisplayState;
   unit: Unit;
 }
 
-function formatSpeed(mps: number, unit: Unit): string {
-  return Math.round(convert(mps, unit)).toString();
+/** Ten stacked cells; the strip translates so only one is in the window. */
+const STRIP_CELLS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+/**
+ * `prefers-reduced-motion` as React state. Live: a change in the OS setting
+ * applies without a reload. False until proven otherwise, so the first frame
+ * is already correct on a system that asks for no motion.
+ */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduced(query.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+  return reduced;
+}
+
+/**
+ * One odometer column: a digit-sized window over a vertical 0-9 strip. The
+ * strip slides with a CSS transform (GPU-composited, no JS per frame) so the
+ * digit rolls instead of swapping. Width comes from the tabular-nums digit
+ * cell, so a column never changes width as it spins.
+ */
+function RollingDigit({
+  digit,
+  index,
+  animate,
+  reducedMotion,
+}: {
+  digit: number;
+  index: number;
+  animate: boolean;
+  reducedMotion: boolean;
+}) {
+  return (
+    <span
+      className="relative inline-block overflow-hidden"
+      style={{ height: '1em' }}
+      data-testid="speed-digit"
+      data-digit={digit}
+      aria-hidden="true"
+    >
+      <span
+        className="flex flex-col"
+        style={{
+          transform: `translateY(-${digit * 10}%)`,
+          transition: digitTransition(index, { reducedMotion, animate }),
+        }}
+      >
+        {STRIP_CELLS.map((cell) => (
+          <span
+            key={cell}
+            className="block"
+            style={{ height: '1em', lineHeight: '1em' }}
+          >
+            {cell}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The rolling speed readout. Renders the displayed speed digit-by-digit (SPEC
+ * M1-O8): each digit is a window over a 0-9 strip that slides into place. It
+ * animates only to the latest pipeline sample — nothing is invented between
+ * fixes — and a frozen STALE/LOST hold passes `animate=false` so held digits
+ * never roll. The plain number stays available to screen readers and to the
+ * mirrored HUD, which composes this transform with its own scaleX(-1).
+ */
+function RollingSpeed({ mps, unit, animate }: { mps: number; unit: Unit; animate: boolean }) {
+  const reducedMotion = useReducedMotion();
+  const digits = speedDigitSlots(mps, unit);
+  const text = roundSpeed(mps, unit).toString();
+  return (
+    <span
+      className="inline-flex items-baseline"
+      data-testid="speed-digits"
+      data-value={text}
+    >
+      <span className="sr-only">{text}</span>
+      {digits.map((digit, index) => (
+        <RollingDigit
+          key={index}
+          digit={digit}
+          index={index}
+          animate={animate}
+          reducedMotion={reducedMotion}
+        />
+      ))}
+    </span>
+  );
 }
 
 /** Fix-state colour token applied to the main readout. */
@@ -31,7 +131,8 @@ export function SpeedReadout({ state, unit }: Props) {
         style={{ fontSize: 'clamp(5rem, 34vw, 14rem)' }}
         data-testid="speed-value"
       >
-        {formatSpeed(state.displaySpeedMps, unit)}
+        {/* Rolls only to the latest sample; a frozen STALE/LOST hold never rolls. */}
+        <RollingSpeed mps={state.displaySpeedMps} unit={unit} animate={!frozen} />
       </div>
       <div className="mt-1 text-2xl text-neutral-400" data-testid="speed-unit">
         {unitLabel(unit)}
