@@ -13,10 +13,28 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- SPEC M1-O6: black window background. Capacitor's SystemBars.setStyle
+             paints the decor view with this color at startup — it is the canvas
+             behind the first WebView frame, so a white value would flash at night. -->
+        <item name="android:windowBackground">#0A0A0A</item>
+        <!-- SPEC M1-O6: wherever a system bar appears over the app it is dark
+             with light icons. Android 15+ ignores these colors (edge-to-edge is
+             enforced); the black app canvas shows through instead. -->
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- SPEC M1-O6: entry is dark — no white flash at night. The splash
+             background feeds the status bar color during the system splash. -->
+        <item name="windowSplashScreenBackground">#0A0A0A</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

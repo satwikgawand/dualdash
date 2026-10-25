@@ -21,3 +21,19 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* System-UI insets (SPEC M1-O6). The mode roots are the direct children of
+   #root — this is the app shell owning system-UI concerns so the mode
+   components stay unaware of bars and cutouts. Keep their content clear of
+   the notch/cutout (top) and of the transient gesture area (bottom), while
+   each root's own background still paints edge-to-edge underneath the
+   padding. `--safe-area-inset-*` is injected by Capacitor 8's SystemBars
+   plugin and is correct even on older Android WebViews; `env()` is the
+   fallback for the PWA in a browser. Both values are 0 on flat screens and
+   in desktop browsers, so the padding collapses to the usual 1rem that the
+   roots' own `p-4` sets on the horizontal axis. This rule is unlayered, so
+   it wins over the layered Tailwind `p-4` for the vertical sides. */
+#root > div {
+  padding-top: calc(1rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
+  padding-bottom: calc(1rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+}

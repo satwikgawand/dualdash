@@ -33,6 +33,17 @@ The owner removed all persistence. DualDash now requests location permission, sh
 - **Docs.** SPEC records M1-O5, marks M1-O2 superseded, and drops the Turso-sync milestone from Next steps.
 - **Tests.** 40 → 35 (one trip-recorder file removed; all remaining suites pass).
 
+### Added — Android system-UI pass: immersive bars, insets, portrait lock (2026-10-25)
+
+System-UI policy per SPEC M1-O6. The GPS pipeline, realtime-only scope (M1-O5), permissions and keep-awake are untouched; `src/core/` has an empty diff.
+
+- **Immersive in both modes.** Status bar and gesture/navigation bar stay hidden while DualDash is foreground, in Drive and HUD mode alike. A swipe from the screen edge reveals them transiently (`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`) — they overlay for a moment and auto-hide, so the driver is never trapped behind a bar. Implemented by a ~30-line native hook in `MainActivity` (`setDecorFitsSystemWindows(false)` + transient-behavior flag + `hide(systemBars())`, re-applied on window focus), plus `SystemBars: { hidden: true }` in `capacitor.config.ts` for the first frame. On Android 10 (API 29) androidx maps the flag to `SYSTEM_UI_FLAG_IMMERSIVE_STICKY`, so transient reveal works back to minSdk.
+- **Insets + cutout safety.** `SystemBars: { insetsHandling: 'css', initialViewportFitValueHint: 'cover' }` injects correct `--safe-area-inset-*` values (working around the Chromium < 140 safe-area bug); mode roots pad via `calc(1rem + var(--safe-area-inset-*, env(...)))`, so the readout, toggle bar and chips clear the notch/cutout and the transient gesture area while each background still paints edge-to-edge (HUD full-bleed black, Drive keeps its 16 px margins). targetSdk 36 edge-to-edge on Android 15 is handled explicitly.
+- **Status bar style.** Dark with light icons wherever the bar appears (entry/splash, transient reveal): `SystemBars: { style: 'DARK' }`, black `statusBarColor`/`navigationBarColor` + `windowLightStatusBar`/`windowLightNavigationBar` in both activity themes, black `windowBackground`, dark `windowSplashScreenBackground`, and the stock white splash drawables recolored to `#0A0A0A` (blue logo kept). No white flash at night.
+- **Portrait lock.** `android:screenOrientation="portrait"` on the launcher activity — dated v1 decision, open to owner override (SPEC M1-O6).
+- **Plugin choice: zero new npm dependencies.** The bundled Capacitor 8 `SystemBars` API covers the official `@capacitor/status-bar` role. `@capacitor-community/navigation-bar` (suggested on the card) returns 404 on npm and GitHub as of 2026-10-25 — removed, hence unmaintained. The maintained `@capawesome/capacitor-navigation-bar` (8.x ↔ Capacitor ≥8) does not set the transient-reveal flag either (its `hide()` only calls `WindowInsetsControllerCompat.hide()`), so the tiny native hook replaces it. Sources cited in SPEC M1-O6.
+- **Verified.** `npm run build` ✓, `npm test` 35/35 ✓, `npm run cap:sync` ✓ (still only 2 plugins: keep-awake, geolocation), `./gradlew assembleDebug` BUILD SUCCESSFUL ✓.
+
 ### Build — Android toolchain + debug APK (2026-10-25)
 
 - **Toolchain.** The VPS now carries Temurin JDK 21.0.13+9 (publisher sha256 verified) at `~/tools/jdk-21` and the Android SDK at `~/Android/Sdk`: command-line tools 13114758, platform-tools 37.0.1, `platforms;android-36`, `build-tools;35.0.0` and `build-tools;36.0.0`. All SDK licenses are accepted.
