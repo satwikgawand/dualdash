@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 
 import { DisplayState } from '../core/types';
-import { Unit, compassLabel, unitLabel } from '../core/units';
+import { Unit, unitLabel } from '../core/units';
 import { ChipView } from '../state/locationChip';
 import { digitTransition, roundSpeed, speedDigitSlots } from './speedRoll';
 
@@ -224,16 +224,6 @@ export function FixBanner({
       <span className="sr-only" data-testid="fix-state">
         {state.fixState}
       </span>
-    </div>
-  );
-}
-
-export function HeadingReadout({ state }: { state: DisplayState }) {
-  const deg = state.headingDeg;
-  const dir = compassLabel(deg);
-  return (
-    <div className="text-lg text-neutral-300" data-testid="heading-readout">
-      {dir ? `${dir} ${Math.round(deg ?? 0)}°` : '—'}
     </div>
   );
 }

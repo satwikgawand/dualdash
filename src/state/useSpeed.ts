@@ -3,13 +3,23 @@
 // staleness progresses even when fixes stop arriving (tunnel). Also owns
 // keep-awake while the app shows realtime data. Nothing is persisted: the
 // view model lives in component memory only (SPEC M1-O5, realtime-only).
+//
+// M2 (SPEC M2-O1..O4) rides the same feed: every fix goes to the session
+// machine (distance / pause / suggestion evidence), every frame to the
+// threshold monitor (over-speed line + buzz cadence) and the heading
+// filter (compass). All three are pure, RAM-only objects held in refs; the
+// hook mirrors them into React state and exposes the driver actions.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SpeedProcessor } from '../core/pipeline';
 import { DisplayState, RawFix } from '../core/types';
 import { Unit } from '../core/units';
+import { Buzz } from '../platform/Buzz';
 import { ScreenLock } from '../platform/ScreenLock';
 import { SourceDiagnostics, SpeedSource } from '../platform/SpeedSource';
+import { HeadingFilter } from '../session/heading';
+import { SessionMachine, SessionSnapshot } from '../session/sessionMachine';
+import { ThresholdMonitor, stepThreshold } from '../session/threshold';
 import { ChipView, chipFor } from './locationChip';
 
 export type DriveMode = 'drive' | 'hud';
@@ -19,6 +29,32 @@ export interface VmDebug {
   rawSpeedMps: number | null;
   fixCount: number;
   lastIntervalMs: number | null;
+}
+
+/** Everything M2 shows (session, over-speed line, compass). RAM-only. */
+export interface M2State {
+  session: SessionSnapshot;
+  /** Over-speed line in km/h, or null when none is set. */
+  alertLimitKmh: number | null;
+  alertOver: boolean;
+  /** Smoothed heading in degrees (held while suppressed). */
+  headingDeg: number | null;
+  headingSuppressed: boolean;
+  /** Bumped once per alert tick; drives the screen-edge flash. */
+  flashKey: number;
+}
+
+/** Driver actions for the M2 surfaces. */
+export interface M2Actions {
+  startSession: () => void;
+  stopSession: () => void;
+  resumeSession: () => void;
+  dismissSummary: () => void;
+  acceptSuggestion: () => void;
+  dismissSuggestion: () => void;
+  /** Delta in km/h (+/-5, +/-10); bases on the current speed when no line. */
+  stepLimit: (deltaKmh: number) => void;
+  clearLimit: () => void;
 }
 
 export interface SpeedViewModel {
@@ -36,6 +72,10 @@ export interface SpeedViewModel {
   chip: ChipView;
   /** Runs the permission request / chain re-check behind the chip's button. */
   allowLocation: () => void;
+  /** M2 view state (session stats, over-speed line, compass). */
+  m2: M2State;
+  /** M2 driver actions (start/stop/resume, suggestion taps, stepper). */
+  m2Actions: M2Actions;
 }
 
 const NS_PER_MS = 1_000_000;
@@ -43,6 +83,7 @@ const NS_PER_MS = 1_000_000;
 export function useSpeed(
   source: SpeedSource,
   screenLock: ScreenLock,
+  buzz: Buzz,
   opts?: { unit?: Unit; mode?: DriveMode },
 ): SpeedViewModel {
   const processorRef = useRef(new SpeedProcessor());
@@ -51,6 +92,14 @@ export function useSpeed(
   const rawSpeedRef = useRef<number | null>(null);
   const fixCountRef = useRef(0);
   const lastIntervalRef = useRef<number | null>(null);
+
+  // M2 pure state machines (SPEC M2-O1..O4). Refs: they outlive renders and
+  // carry the whole process-lifetime nag guard.
+  const sessionRef = useRef(new SessionMachine());
+  const thresholdRef = useRef(new ThresholdMonitor());
+  const headingRef = useRef(new HeadingFilter());
+  const flashRef = useRef(0);
+  const latestSpeedRef = useRef(0);
 
   const [state, setState] = useState<DisplayState>(() =>
     processorRef.current.getSnapshot(0n),
@@ -66,6 +115,28 @@ export function useSpeed(
     fixCount: 0,
     lastIntervalMs: null,
   });
+  const [m2, setM2] = useState<M2State>(() => ({
+    session: sessionRef.current.snapshot(performance.now()),
+    alertLimitKmh: thresholdRef.current.limit(),
+    alertOver: thresholdRef.current.isOver(),
+    headingDeg: headingRef.current.value(),
+    headingSuppressed: headingRef.current.isSuppressed(),
+    flashKey: 0,
+  }));
+
+  /** Mirror the pure M2 machines into React state. */
+  const syncM2 = useCallback((tMs: number): M2State => {
+    const next: M2State = {
+      session: sessionRef.current.snapshot(tMs),
+      alertLimitKmh: thresholdRef.current.limit(),
+      alertOver: thresholdRef.current.isOver(),
+      headingDeg: headingRef.current.value(),
+      headingSuppressed: headingRef.current.isSuppressed(),
+      flashKey: flashRef.current,
+    };
+    setM2(next);
+    return next;
+  }, []);
 
   // Chain health (permission / provider / watch / last error) is pushed by the
   // source; the chip and the overlay read it (SPEC M1-O7).
@@ -79,7 +150,7 @@ export function useSpeed(
     return BigInt(Math.round(performance.now() * NS_PER_MS));
   }, []);
 
-  // Handle one raw fix: feed processor, refresh state.
+  // Handle one raw fix: feed processor + session machine, refresh state.
   const handleFix = useCallback(
     (fix: RawFix) => {
       const proc = processorRef.current;
@@ -92,14 +163,52 @@ export function useSpeed(
       }
       lastFixNsRef.current = fix.elapsedRealtimeNanos;
 
-      setState(proc.getSnapshot(nowNs()));
+      const tMs = performance.now();
+      const snap = proc.getSnapshot(nowNs());
+      // Session evidence needs real fixes: distance is fix-to-fix (M2-O1).
+      sessionRef.current.onFix({
+        tMs,
+        speedMps: snap.displaySpeedMps,
+        lat: fix.lat,
+        lon: fix.lon,
+      });
+      latestSpeedRef.current = snap.displaySpeedMps;
+
+      setState(snap);
       setDebug({
         rawSpeedMps: rawSpeedRef.current,
         fixCount: fixCountRef.current,
         lastIntervalMs: lastIntervalRef.current,
       });
+      syncM2(tMs);
     },
-    [nowNs],
+    [nowNs, syncM2],
+  );
+
+  // M2 per-frame feed: suggestion timers, over-speed line, compass filter.
+  // An alert tick fires the haptic and bumps the edge flash (SPEC M2-O3).
+  const feedFrame = useCallback(
+    (snap: DisplayState, tMs: number) => {
+      sessionRef.current.tick(tMs);
+      latestSpeedRef.current = snap.displaySpeedMps;
+      // A frozen hold (STALE/LOST) never fires and never shows "over":
+      // the alert only speaks about real measurements (SPEC M2-O3).
+      const fired =
+        snap.confidence === 'frozen'
+          ? (thresholdRef.current.suspend(), false)
+          : thresholdRef.current.push(snap.displaySpeedMps, tMs);
+      if (fired) {
+        flashRef.current += 1;
+        buzz.alert();
+      }
+      headingRef.current.push({
+        headingDeg: snap.headingDeg,
+        speedMps: snap.displaySpeedMps,
+        tMs,
+      });
+      syncM2(tMs);
+    },
+    [buzz, syncM2],
   );
 
   // Start the source + a staleness tick. The tick runs while mounted so
@@ -119,7 +228,9 @@ export function useSpeed(
 
     const tick = () => {
       if (!mounted) return;
-      setState(processorRef.current.getSnapshot(nowNs()));
+      const snap = processorRef.current.getSnapshot(nowNs());
+      setState(snap);
+      feedFrame(snap, performance.now());
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -130,7 +241,7 @@ export function useSpeed(
       unsub();
       source.stop();
     };
-  }, [source, handleFix, nowNs]);
+  }, [source, handleFix, feedFrame, nowNs]);
 
   // Keep the screen on while the app shows realtime data; release on unmount.
   useEffect(() => {
@@ -139,6 +250,51 @@ export function useSpeed(
       void screenLock.release();
     };
   }, [screenLock]);
+
+  const m2Actions = useMemo<M2Actions>(
+    () => ({
+      startSession: () => {
+        sessionRef.current.start(performance.now());
+        syncM2(performance.now());
+      },
+      stopSession: () => {
+        sessionRef.current.stop(performance.now());
+        // The line is an in-session tool (SPEC M2-O3): STOP clears it.
+        thresholdRef.current.setLimit(null);
+        syncM2(performance.now());
+      },
+      resumeSession: () => {
+        sessionRef.current.resume(performance.now());
+        syncM2(performance.now());
+      },
+      dismissSummary: () => {
+        sessionRef.current.dismiss();
+        syncM2(performance.now());
+      },
+      acceptSuggestion: () => {
+        sessionRef.current.acceptSuggestion(performance.now());
+        syncM2(performance.now());
+      },
+      dismissSuggestion: () => {
+        sessionRef.current.dismissSuggestion();
+        syncM2(performance.now());
+      },
+      stepLimit: (deltaKmh: number) => {
+        const next = stepThreshold(
+          thresholdRef.current.limit(),
+          latestSpeedRef.current,
+          deltaKmh,
+        );
+        thresholdRef.current.setLimit(next);
+        syncM2(performance.now());
+      },
+      clearLimit: () => {
+        thresholdRef.current.setLimit(null);
+        syncM2(performance.now());
+      },
+    }),
+    [syncM2],
+  );
 
   const chip: ChipView = chipFor({
     permission: location.permission,
@@ -160,5 +316,7 @@ export function useSpeed(
     location,
     chip,
     allowLocation,
+    m2,
+    m2Actions,
   };
 }

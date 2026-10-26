@@ -4,6 +4,16 @@ All notable changes to DualDash are documented here. Format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added — Milestone 2 (2026-10-26)
+
+Session stats, an over-speed alert and a rotating compass — all RAM-only; the realtime-only scope (M1-O5) holds.
+
+- **Session stats** (M2-O1). Manual START/STOP in Drive mode; STOP shows a summary card (distance / elapsed / avg / max) until dismissed. Silent auto-pause after 90 s at ≤ 1 m/s, auto-resume at ≥ 3 m/s held 2 s. Never auto-ends, never prompts to pause.
+- **Start suggestion, nag-safe** (M2-O2). "Start session?" chip after > 5 km/h held 10 s with no session; visible 15 s; ✕ or ignore silences it for the whole drive; 10-minute re-arm cooldown. At most one prompt per drive — proven by tests.
+- **Over-speed threshold alert** (M2-O3). Quick stepper (± 5 / ± 10 km/h, floor 5); crossing above fires a haptic (`@capacitor/haptics` v8.0.2 — the only new dependency, Capacitor-8 verified) plus a screen-edge flash; re-fires at most every 15 s; 1 km/h hysteresis. No-vibrator devices keep the flash.
+- **Rotating compass** (M2-O4). GPS course smoothed through a unit-vector filter (TAU 1.5 s, seam-free by construction); ring under a fixed index in Drive mode, small arrow in HUD; suppressed to `--` below 3 m/s, re-seeds after 30 s of suppression.
+- **Tests.** 102 → **209 / 209** (13 files): session state machine, nag guard, threshold hysteresis + cadence, heading filter incl. the 0/360 seam, session formatting.
+
 ### Added — Milestone 1 (2026-10-25)
 
 First drive-testable build: a standalone GPS speed HUD with two display modes and the research-bound speed pipeline. Realtime-only: it stores nothing (see the scope change below).

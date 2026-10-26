@@ -1,20 +1,29 @@
-// App: picks the SpeedSource / ScreenLock implementations and renders the
-// active mode from the single data layer. In a browser (dev/PWA) it falls back
-// to the WebScreenLock; the SpeedSource is chosen by the caller in main.tsx.
+// App: picks the SpeedSource / ScreenLock / Buzz implementations and renders
+// the active mode from the single data layer. In a browser (dev/PWA) it falls
+// back to the WebScreenLock; the SpeedSource is chosen by the caller in
+// main.tsx. The screen-edge flash renders above BOTH modes (SPEC M2-O3).
 // No persistence is wired here: the app is realtime-only (SPEC M1-O5).
 
 import { useSpeed, SpeedViewModel } from './state/useSpeed';
 import { ScreenLock } from './platform/ScreenLock';
 import { SpeedSource } from './platform/SpeedSource';
+import { Buzz } from './platform/Buzz';
 import { DriveMode } from './components/DriveMode';
 import { HudMode } from './components/HudMode';
+import { EdgeFlash } from './components/EdgeFlash';
 
 interface AppProps {
   source: SpeedSource;
   screenLock: ScreenLock;
+  buzz: Buzz;
 }
 
-export function App({ source, screenLock }: AppProps) {
-  const vm: SpeedViewModel = useSpeed(source, screenLock);
-  return vm.mode === 'hud' ? <HudMode vm={vm} /> : <DriveMode vm={vm} />;
+export function App({ source, screenLock, buzz }: AppProps) {
+  const vm: SpeedViewModel = useSpeed(source, screenLock, buzz);
+  return (
+    <>
+      {vm.mode === 'hud' ? <HudMode vm={vm} /> : <DriveMode vm={vm} />}
+      <EdgeFlash flashKey={vm.m2.flashKey} />
+    </>
+  );
 }

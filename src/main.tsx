@@ -8,6 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import { App } from './App';
 import { CapacitorSpeedSource } from './platform/capacitorSpeedSource';
 import { MockSpeedSource, MockPoint } from './platform/mockSpeedSource';
+import { Buzz, HapticsBuzz } from './platform/Buzz';
 import {
   CapacitorScreenLock,
   ScreenLock,
@@ -57,12 +58,19 @@ function pickScreenLock(): ScreenLock {
     : new WebScreenLock();
 }
 
+// Haptics (SPEC M2-O3): one implementation for both targets — the official
+// @capacitor/haptics plugin falls back to navigator.vibrate on the web.
+function pickBuzz(): Buzz {
+  return new HapticsBuzz();
+}
+
 const root = createRoot(document.getElementById('root')!);
 root.render(
   <StrictMode>
     <App
       source={pickSource()}
       screenLock={pickScreenLock()}
+      buzz={pickBuzz()}
     />
   </StrictMode>,
 );
