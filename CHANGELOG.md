@@ -18,6 +18,17 @@ Owner device report on v1.1 (APK 65ba72f): the scroll direction is now approved 
 - **Owner check for v1.2 (device).** Rotate the phone right → the overlay's `heading` value must INCREASE, and west must sit LEFT of north on the tape.
 
 
+### Build — heading-normalized debug APK v1.2 (versionCode 3), 2026-10-27
+
+Release artifact for the M2-O11 alpha-normalization entry above (built from master d118ebc + version-bump commit).
+
+- **Name:** `dualdash-v1.2-heading-normalized-debug.apk` — **sha256** `fe132ee2742876fd2b320b72d2983cec012f625e0b00f79ecfc202655d4ba810` (11,439,439 bytes, debug-signed, `com.satwik.dualdash`).
+- **Version:** versionCode **2 → 3**, versionName **"1.1" → "1.2"** (`android/app/build.gradle`); aapt badging on the APK reads `versionCode='3' versionName='1.2'`.
+- **Bundle match:** embedded `assets/public/assets/index-B2IdaYHl.js` sha `a1af42028087513f6c0386f5ea7dfe6518e1e4a6ba7c42bc2201a302f8ab204f` == fresh `dist/assets/index-B2IdaYHl.js` — byte-identical.
+- **Heading proof (embedded sourcemap `index-B2IdaYHl.js.map`):** `grep -o 'normalizeDeg(360 - e.alpha)'` 1 hit, `grep -o 'counter-clockwise alpha -> true azimuth'` 1 hit, `grep -o 'M2-O11'` 12 hits, `grep -o 'heading = 360 - alpha'` 1 hit; natural tape implementation `grep -o 'export function tapeItemX(deg: number, pxPerDeg: number = TAPE_PX_PER_DEG)'` 1 hit, `grep -o 'tapeItemX'` 6 hits. Minified bundle carries the normalization too: `grep -o '360-s.alpha'` → `Ym(360-s.alpha)`.
+- **Plugins in classes*.dex (8 dex files):** `KeepAwake` 10, `GeolocationPlugin` 48, `HapticsPlugin` 3; `assets/capacitor.plugins.json` lists keep-awake 6.0.0, geolocation 8.2.4, haptics 8.0.2; embedded `assets/capacitor.config.json` has SystemBars `hidden:true, style:DARK, insetsHandling:css, initialViewportFitValueHint:cover`.
+- **Toolchain:** JDK 21, Android SDK build-tools 36.0.0; `npm ci`, `npm run build`, `cap:sync`, `./gradlew assembleDebug` all exit 0. Built from `d118ebc` (M2-O11, suite 327/327).
+
 ### Build — tape-inversion debug APK v1.1 (versionCode 2), 2026-10-27
 
 Release artifact for the M2-O10 tape-sign amendment above (built from the version-bump commit on master; parent d91dbdd).
