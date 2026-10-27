@@ -4,11 +4,11 @@
 // under a fixed centre index, so the heading you are on is always in the
 // middle and the horizon scrolls past as you turn.
 //
-// Scroll direction is the standard compass-card convention (SPEC M2-O10): the
-// rose reads W-N-E (degrees increase to the RIGHT of the index), so turning
-// RIGHT slides the strip LEFT and turning LEFT slides it RIGHT — content moves
-// opposite to the rotation, and the mark you are turning toward walks in from
-// the turn side. The follow stays continuous across the 0°/360° seam so a north
+// Scroll direction is the owner-corrected compass-card direction (SPEC
+// M2-O10, amended): the rose reads E-N-W (degrees increase to the LEFT of
+// the index), so a rising heading slides the strip RIGHT and a falling one
+// slides it LEFT — the mark you turn toward walks in from the LEFT edge to
+// the index. The follow stays continuous across the 0°/360° seam so a north
 // crossing never lurches the tape a whole copy-width the wrong way.
 //
 // The strip is drawn three times (-360°, 0°, +360°), so the visible window
@@ -68,13 +68,13 @@ export function HeadingTape({
   const quiet = suppressed || dimmed;
 
   // Seam-safe follow (SPEC M2-O10). The pipeline heading wraps into [0, 360),
-  // so a naive -heading·px-per-deg transform jumps a whole copy-width at every
-  // north crossing and the 250 ms CSS transition lurches the tape the WRONG
+  // so a naive heading·px-per-deg transform jumps a whole copy-width at every
+  // north crossing and the 250 ms CSS transition lurches the tape the wrong
   // way (owner report: "when I move left, it scrolls left"). Instead we keep
   // the RAW transform continuous by picking the tape copy nearest the previous
-  // frame, so a turn always slides content the compass-card way — turn right
-  // -> content left, turn left -> content right — including across the seam.
-  // A rare whole-copy fold (visually identical) stops a long net turn from
+  // frame, so a turn always slides content the owner-corrected way — heading
+  // up -> content right, heading down -> content left — including across the
+  // seam. A rare whole-copy fold (visually identical) stops a long net turn from
   // walking the window off the drawn copies; it is applied with the follow
   // transition suppressed so it never shows as motion. The previous translate
   // is committed in an effect (not during render) so StrictMode's double

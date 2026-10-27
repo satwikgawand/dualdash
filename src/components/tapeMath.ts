@@ -8,12 +8,15 @@
 // drawn copies (it spans about ±100° at 4.5 px/deg), so the 0°/360° seam is
 // never on screen — no modulo reset, no jump.
 //
-// Compass-card direction + seam continuity (SPEC M2-O10): the rose is laid
-// out W-N-E — degrees increase to the RIGHT of the fixed centre index — so
-// turning RIGHT slides the tape content LEFT (the higher mark walks in from
-// the turn side toward the index) and turning LEFT slides it RIGHT. That is
-// the standard compass-card / heading-tape convention the owner asked for.
-// The follow transition animates the *numeric* transform, so `tapeTranslateX`
+// Steady-state direction + seam continuity (SPEC M2-O10, amended 2026-10-27
+// on the owner's device report): the rose is laid out E-N-W — degrees
+// increase to the LEFT of the fixed centre index — so the tape content
+// slides OPPOSITE to the heading change. The heading goes up -> content
+// slides RIGHT and the mark being turned toward walks in from the LEFT edge
+// to the index; the heading goes down -> content slides LEFT. On the phone a
+// right turn lowers the heading (the old W-N-E sign scrolled WITH the
+// rotation), so this is the turn-right -> slide-left behaviour the owner
+// asked for. The follow transition animates the *numeric* transform, so `tapeTranslateX`
 // must stay continuous across the 0°/360° seam or the 250 ms CSS transition
 // scrolls a whole copy-width the wrong way on a north crossing. The maths
 // picks the tape copy nearest the previous frame to keep the transform
@@ -56,11 +59,14 @@ export function normalizeDeg(deg: number): number {
 
 /**
  * Track translation in px — seam-safe (SPEC M2-O10). The track is anchored at
- * the container's centre (left: 50%), so translating by -heading·px-per-deg
- * parks the current heading exactly under the fixed index. The rose is laid
- * out W-N-E (degrees increase to the RIGHT of the index), which is the
- * compass-card convention: turning right slides the content LEFT, turning left
- * slides it RIGHT.
+ * the container's centre (left: 50%), and the rose is laid out E-N-W (degrees
+ * increase to the LEFT of the index — `tapeItemX` mirrors the rose), so
+ * translating by +heading·px-per-deg parks the current heading exactly under
+ * the fixed index. The steady-state sign is the owner-device-corrected one
+ * (M2-O10 amendment, card t_05c7dd01): the heading goes up -> the
+ * translation grows -> content slides RIGHT; the heading goes down -> content
+ * slides LEFT. The old negative sign scrolled the tape WITH the phone's
+ * rotation on the device and was overruled by the owner's on-device test.
  *
  * Because the rose is drawn three times, the translation is only defined up to
  * a whole copy width (TAPE_COPY_PX) — hopping by one copy lands the identical
@@ -78,7 +84,7 @@ export function normalizeDeg(deg: number): number {
  * through north, so the 250 ms transition scrolled the tape a full width the
  * WRONG way on a seam crossing (owner report: "when I move left, it scrolls
  * left"). Nearest-copy keeps the transform continuous, so the transition
- * always animates the short, compass-card-correct slide.
+ * always animates the short, correctly-directed slide.
  *
  * @param prevTranslateX the previous frame's translation (0 when unknown), so
  * the copy choice can stay continuous. Pure: no hidden state, fully testable.
@@ -89,7 +95,7 @@ export function tapeTranslateX(
   pxPerDeg: number = TAPE_PX_PER_DEG,
 ): number {
   const copy = 360 * pxPerDeg;
-  const base = -normalizeDeg(headingDeg) * pxPerDeg; // the k = 0 copy, ∈ [-copy, 0]
+  const base = normalizeDeg(headingDeg) * pxPerDeg; // the k = 0 copy, ∈ [0, copy]
   // Nearest whole-copy offset to the previous frame → continuous transform.
   const x = base + Math.round((prevTranslateX - base) / copy) * copy;
   return x === 0 ? 0 : x; // not -0: the value goes straight into a transform
@@ -151,9 +157,11 @@ export function tapeItems(): TapeItem[] {
   return items;
 }
 
-/** Horizontal offset of a tape item from the track's own 0°, in px. */
+/** Horizontal offset of a tape item from the track's own 0°, in px. The rose
+ * is mirrored (M2-O10 amendment): degrees increase to the LEFT of the index,
+ * so a higher mark sits left of centre. */
 export function tapeItemX(deg: number, pxPerDeg: number = TAPE_PX_PER_DEG): number {
-  return deg * pxPerDeg;
+  return -deg * pxPerDeg;
 }
 
 /** Centre readout: "N 354°". Empty when there is no course at all. */
