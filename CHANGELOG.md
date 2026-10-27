@@ -4,6 +4,17 @@ All notable changes to DualDash are documented here. Format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Build — tape-inversion debug APK v1.1 (versionCode 2), 2026-10-27
+
+Release artifact for the M2-O10 tape-sign amendment above (built from the version-bump commit on master; parent d91dbdd).
+
+- **Name:** `dualdash-v1.1-tape-inversion-debug.apk` — **sha256** `65ba72fa43abe5ccc10b91a6b8e1ebbd68b5dc1eb84702b17950ba1d2634e4f2` (11,438,599 bytes, debug-signed, `com.satwik.dualdash`).
+- **Version:** versionCode **1 → 2**, versionName **"1.0" → "1.1"** (`android/app/build.gradle`); aapt badging on the APK reads `versionCode='2' versionName='1.1'`.
+- **Bundle match:** embedded `assets/public/assets/index-CQjAA_IB.js` sha `f952a08f17c8c4a64bdfb118e1595132713367d1f272d84c1344d5a18f421226` == fresh `dist/assets/index-CQjAA_IB.js` — byte-identical.
+- **Tape-sign proof (embedded sourcemap `index-CQjAA_IB.js.map`):** `tapeTranslateX` 5 hits, `tapeItemX` 6 hits, `foldTranslateX` 5 hits — the amended implementation is inside the APK.
+- **Plugins in classes*.dex (8 dex files):** `KeepAwake` 10, `GeolocationPlugin` 48, `HapticsPlugin` 3; `assets/capacitor.plugins.json` lists keep-awake 6.0.0, geolocation 8.2.4, haptics 8.0.2; SystemBars hidden/DARK/css/cover as before.
+- **Toolchain:** JDK 21, Android SDK build-tools 36.0.0; `npm run build` + `cap:sync` + `./gradlew assembleDebug` all exit 0.
+
 ### Fixed — heading tape scrolls WITH the turn on device: steady-state sign inverted (SPEC M2-O10 amendment, 2026-10-27)
 
 Owner report (direction-fix APK 84fabbb): \"still the same, the scroll should be on opposite side\" — the seam-continuity fix held, but the tape still slid WITH the phone's rotation. The M2-O10 paper convention (heading up → content slides LEFT) was overruled by the owner's on-device test: the app heading falls while the phone turns right, so that sign scrolls with the rotation on this device.
