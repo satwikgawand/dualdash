@@ -4,6 +4,13 @@
 // under a fixed centre index, so the heading you are on is always in the
 // middle and the horizon scrolls past as you turn.
 //
+// Scroll direction is the standard compass-card convention (SPEC M2-O10): the
+// rose reads W-N-E (degrees increase to the RIGHT of the index), so turning
+// RIGHT slides the strip LEFT and turning LEFT slides it RIGHT — content moves
+// opposite to the rotation, and the mark you are turning toward walks in from
+// the turn side. The follow stays continuous across the 0°/360° seam so a north
+// crossing never lurches the tape a whole copy-width the wrong way.
+//
 // The strip is drawn three times (-360°, 0°, +360°), so the visible window
 // never reaches the 0°/360° seam: the wrap is seamless by construction and
 // there is no modulo reset to flicker (tapeMath.ts). Below the speed gate
@@ -12,10 +19,13 @@
 // heading, dims, and reads "— heading —" instead of showing noise. HUD mode
 // keeps the small arrow: the windshield stays about speed.
 
+import { useEffect, useRef } from 'react';
 import { HeadingSource } from '../session/heading';
 import {
   TAPE_EASING,
   TAPE_FOLLOW_MS,
+  TAPE_SAFE_BAND_PX,
+  foldTranslateX,
   tapeItems,
   tapeItemX,
   tapeReadout,
@@ -57,6 +67,26 @@ export function HeadingTape({
   // is a STALE/LOST hold — a held heading must not read as a live one.
   const quiet = suppressed || dimmed;
 
+  // Seam-safe follow (SPEC M2-O10). The pipeline heading wraps into [0, 360),
+  // so a naive -heading·px-per-deg transform jumps a whole copy-width at every
+  // north crossing and the 250 ms CSS transition lurches the tape the WRONG
+  // way (owner report: "when I move left, it scrolls left"). Instead we keep
+  // the RAW transform continuous by picking the tape copy nearest the previous
+  // frame, so a turn always slides content the compass-card way — turn right
+  // -> content left, turn left -> content right — including across the seam.
+  // A rare whole-copy fold (visually identical) stops a long net turn from
+  // walking the window off the drawn copies; it is applied with the follow
+  // transition suppressed so it never shows as motion. The previous translate
+  // is committed in an effect (not during render) so StrictMode's double
+  // render stays stable.
+  const prevTranslateRef = useRef(0);
+  const rawTranslateX = tapeTranslateX(heading, prevTranslateRef.current);
+  const translateX = foldTranslateX(rawTranslateX, TAPE_SAFE_BAND_PX);
+  const folded = translateX !== rawTranslateX;
+  useEffect(() => {
+    prevTranslateRef.current = translateX;
+  }, [translateX]);
+
   return (
     <div
       className="-mx-4 select-none"
@@ -76,8 +106,10 @@ export function HeadingTape({
         <div
           className="dd-tape-track absolute left-1/2 top-0 h-full"
           style={{
-            transform: `translateX(${tapeTranslateX(heading)}px)`,
-            transition: `transform ${TAPE_FOLLOW_MS}ms ${TAPE_EASING}`,
+            transform: `translateX(${translateX}px)`,
+            transition: folded
+              ? 'none'
+              : `transform ${TAPE_FOLLOW_MS}ms ${TAPE_EASING}`,
           }}
           data-testid="heading-tape-track"
         >

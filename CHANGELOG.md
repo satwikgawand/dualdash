@@ -4,6 +4,15 @@ All notable changes to DualDash are documented here. Format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed — heading tape scrolls the wrong way at the north seam (SPEC M2-O10, 2026-10-27)
+
+Owner report (rotation APK e61266b0): \"when I move left, the compass scrolls left as well — should move to the opposite side.\" The compass-card convention is locked in: at north the 90° (E) mark sits +405 px to the RIGHT of the index, turning right slides the tape LEFT and turning left slides it RIGHT (content moves opposite to the rotation). The steady-state sign was already correct — the real defect was the 0°/360° seam.
+
+- **Seam-safe follow** (`src/components/tapeMath.ts`). The pipeline wraps `headingDeg` into [0, 360) and `tapeTranslateX` normalised again, so every north crossing jumped the raw CSS transform a whole copy-width (±1620 px) and the 250 ms follow transition animated that jump the wrong way — a left turn across north slid the tape 1575 px LEFT. `tapeTranslateX(h, prevTranslateX)` now picks the tape copy nearest the previous frame, keeping the transform continuous so the transition always animates the short, compass-card-correct slide, seam included.
+- **Whole-copy fold guard** (`foldTranslateX`). A long net turn can otherwise walk the visible window off the end of the three drawn copies. `foldTranslateX` folds the value back into a 300° safe band (`TAPE_SAFE_BAND_PX`) by whole copies — a visually-identical hop — and `HeadingTape.tsx` applies it with the follow transition suppressed so it never shows as motion.
+- **Unchanged.** 3-copy wrap (rose at −360/0/+360), 250 ms follow + easing, degrees-per-px, edge fades, suppressed/dimmed idle, `data-source` attr, reduced-motion instant, no layout shift; `src/core` diff empty. The HUD arrow (`rotate(-heading)` in a `scaleX(-1)` mirror, no transition) shares nothing with the tape's translate and is already correct — left as-is.
+- **Tests.** 316 → **325 / 325**: compass-card direction by worked example (E mark +405 px right at north; turning right 0→90 slides it left to the index), turning left slides right, seam continuity left and right, a full net turn stays continuous, `foldTranslateX` whole-copy guard. Browser evidence: seam left 5→355 now slides right 45 px in smooth steps; full 360° turn keeps ≥13 ticks visible and the transform bounded.
+
 ### Added — parked heading from the phone compass + stuck-bearing guard (SPEC M2-O9, 2026-10-27)
 
 Owner report after the M2-O8 fix: "I see the directions now, but when I move/turn my phone, it doesn't seem to move. It's stuck at North." Both hypotheses are covered — a parked phone can never move a GPS course (H1), and a provider can send a constant bearing (H2).
