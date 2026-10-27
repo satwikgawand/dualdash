@@ -47,7 +47,7 @@ function HudHeading({ headingDeg, suppressed }: { headingDeg: number | null; sup
 export function HudMode({ vm }: Props) {
   return (
     <div
-      className="flex min-h-dvh w-full flex-col gap-3 bg-black px-4 pb-4"
+      className="dd-hud flex min-h-dvh w-full flex-col gap-3 bg-black px-4 pb-4"
       data-testid="hud-root"
     >
       <header className="flex flex-col gap-2">

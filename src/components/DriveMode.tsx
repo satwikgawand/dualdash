@@ -33,9 +33,12 @@ export function DriveMode({ vm }: Props) {
 
   return (
     <div
-      className="flex min-h-dvh w-full flex-col gap-3 px-4 pb-4 text-[var(--dd-text-1)]"
+      className="dd-drive flex min-h-dvh w-full flex-col gap-3 px-4 pb-4 text-[var(--dd-text-1)]"
       data-testid="drive-root"
     >
+      {/* Portrait: two rows (brand+unit, then the full-width mode switch).
+          Landscape (SPEC M2-O12) folds this into one header row that also
+          carries the status chips — the shell does that in CSS, not here. */}
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <span className="dd-micro tracking-[0.22em]">DualDash</span>
@@ -55,34 +58,44 @@ export function DriveMode({ vm }: Props) {
         source={vm.m2.headingSource}
       />
 
-      <div className="flex flex-col items-center gap-3 pt-1">
-        <SpeedReadout state={vm.state} unit={vm.unit} />
-        {/* The over-speed line sits under the readout, in-session only (M2-O3). */}
-        {inSession ? (
-          <ThresholdBar
-            limitKmh={vm.m2.alertLimitKmh}
-            over={vm.m2.alertOver}
-            speedMps={vm.state.displaySpeedMps}
+      {/* Readout row. Portrait stacks it exactly as before; landscape
+          (SPEC M2-O12) puts the hero readout on the left and the session
+          controls beside it, so a 360 px-tall viewport never scrolls. */}
+      <div className="dd-drive-main flex flex-col gap-3">
+        <div className="dd-drive-readout flex flex-col items-center gap-3 pt-1">
+          <SpeedReadout state={vm.state} unit={vm.unit} />
+        </div>
+        {/* items-stretch in portrait keeps the panel full-width exactly as
+            before; landscape centres it beside the readout (SPEC M2-O12). */}
+        <div className="dd-drive-controls flex flex-col gap-3 landscape:items-center">
+          {/* The over-speed line sits under the readout, in-session only (M2-O3);
+              in landscape it rides under these controls (SPEC M2-O12). */}
+          {inSession ? (
+            <ThresholdBar
+              limitKmh={vm.m2.alertLimitKmh}
+              over={vm.m2.alertOver}
+              speedMps={vm.state.displaySpeedMps}
+              unit={vm.unit}
+              onStep={vm.m2Actions.stepLimit}
+              onClear={vm.m2Actions.clearLimit}
+            />
+          ) : null}
+          <SessionPanel
             unit={vm.unit}
-            onStep={vm.m2Actions.stepLimit}
-            onClear={vm.m2Actions.clearLimit}
+            session={session}
+            onStart={vm.m2Actions.startSession}
+            onStop={vm.m2Actions.stopSession}
+            onResume={vm.m2Actions.resumeSession}
+            onDismiss={vm.m2Actions.dismissSummary}
+            onAcceptSuggestion={vm.m2Actions.acceptSuggestion}
+            onDismissSuggestion={vm.m2Actions.dismissSuggestion}
           />
-        ) : null}
+        </div>
       </div>
 
-      <SessionPanel
-        unit={vm.unit}
-        session={session}
-        onStart={vm.m2Actions.startSession}
-        onStop={vm.m2Actions.stopSession}
-        onResume={vm.m2Actions.resumeSession}
-        onDismiss={vm.m2Actions.dismissSummary}
-        onAcceptSuggestion={vm.m2Actions.acceptSuggestion}
-        onDismissSuggestion={vm.m2Actions.dismissSuggestion}
-      />
-
       {/* Status/chip row: also the hidden diagnostics gate (SPEC M2-O7).
-          Five taps inside three seconds flip the drive-test overlay. */}
+          Five taps inside three seconds flip the drive-test overlay. In
+          landscape it moves into the header row (SPEC M2-O12), same node. */}
       <div
         className="mt-auto flex flex-wrap items-center justify-center gap-2 pt-1"
         onClick={onGateTap}

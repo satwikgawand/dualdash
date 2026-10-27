@@ -225,18 +225,133 @@ body {
   }
 }
 
-/* System-UI insets (SPEC M1-O6). The mode roots are the direct children of
-   #root — this is the app shell owning system-UI concerns so the mode
-   components stay unaware of bars and cutouts. Keep their content clear of
-   the notch/cutout (top) and of the transient gesture area (bottom), while
-   each root's own background still paints edge-to-edge underneath the
-   padding. `--safe-area-inset-*` is injected by Capacitor 8's SystemBars
-   plugin and is correct even on older Android WebViews; `env()` is the
-   fallback for the PWA in a browser. Both values are 0 on flat screens and
-   in desktop browsers, so the padding collapses to the usual 1rem that the
-   roots' own `p-4` sets on the horizontal axis. This rule is unlayered, so
-   it wins over the layered Tailwind `p-4` for the vertical sides. */
+/* System-UI insets (SPEC M1-O6, side axes added by M2-O12). The mode roots
+   are the direct children of #root — this is the app shell owning system-UI
+   concerns so the mode components stay unaware of bars and cutouts. Keep
+   their content clear of the notch/cutout and of the transient gesture area
+   on EVERY side, while each root's own background still paints edge-to-edge
+   underneath the padding. Portrait puts the cutout (top) and the gesture
+   area (bottom) on the vertical axes; LANDSCAPE turns both 90°, so the
+   cutout and the gesture edge move to the left/right axes — those two
+   paddings are the M2-O12 addition, and they are what keeps the tape and
+   the readout out of a side notch. `--safe-area-inset-*` is injected by
+   Capacitor 8's SystemBars plugin (all four directions) and is correct even
+   on older Android WebViews; `env()` is the fallback for the PWA in a
+   browser. All four values are 0 on flat screens and in desktop browsers,
+   so the padding collapses to the usual 1rem that the roots' own `p-4`
+   sets. This rule is unlayered, so it wins over the layered Tailwind `p-4`. */
 #root > div {
   padding-top: calc(1rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)));
   padding-bottom: calc(1rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  padding-left: calc(1rem + var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+  padding-right: calc(1rem + var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
+}
+
+/* The one hero-readout size (SPEC M2-O7, height-clamped for landscape by
+   M2-O12). Portrait keeps the M2-O7 clamp byte-for-byte — same numbers, now
+   in a class so landscape can override it without an inline style. In
+   landscape the viewport is short (360-480 px tall) and 33vw alone would
+   ask for a 208 px numeral with nowhere to put it, so the clamp also caps
+   the size at a third of the HEIGHT; the readout stays the hero by a wide
+   margin (nothing else on screen is over 30 px). Unlayered, like the inset
+   rule above. */
+.dd-readout {
+  font-size: clamp(4.75rem, 33vw, 13rem);
+}
+
+/* Landscape layout (SPEC M2-O12). The shell owns orientation the way it
+   owns system-UI insets (M1-O6): the portrait markup is untouched, and this
+   block only rearranges what already renders. Nothing here changes under
+   `prefers-reduced-motion` (all of it is layout, not motion). */
+@media (orientation: landscape) {
+  /* The readout clamps by height as well as width (see .dd-readout above). */
+  .dd-readout {
+    font-size: clamp(4.75rem, min(33vw, 32dvh), 13rem);
+  }
+
+  /* Drive mode becomes a four-row grid: a single header row that now also
+     carries the status chips, the full-width tape, the readout row, and an
+     auto-height banner row (0 px until the FixBanner or the debug overlay
+     actually renders, so the live view keeps the whole viewport). */
+  .dd-drive {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head chips'
+      'tape tape'
+      'main main'
+      'bann bann';
+    gap: 0.5rem 0.75rem;
+  }
+  /* Header: brand + unit switch on the left, mode switch on the right. */
+  .dd-drive > header {
+    grid-area: head;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .dd-drive > header > div:first-child {
+    flex: 1 1 auto;
+  }
+  /* The tape keeps its full-width bleed (its own -mx-4 cancels the 1 rem
+     padding and stops at the side inset) and loses 8 px of height. */
+  .dd-drive > [data-testid='heading-tape'] {
+    grid-area: tape;
+  }
+  .dd-drive > [data-testid='heading-tape'] .dd-tape-fade {
+    height: 3.5rem;
+  }
+  /* The readout row: hero on the left, session controls on the right. */
+  .dd-drive > .dd-drive-main {
+    grid-area: main;
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+  }
+  .dd-drive > .dd-drive-main > .dd-drive-readout {
+    flex: 1 1 auto;
+    padding-top: 0;
+  }
+  .dd-drive > .dd-drive-main > .dd-drive-controls {
+    gap: 0.5rem;
+  }
+  /* The over-speed line (M2-O3) rides under the session controls in
+     landscape: same glance band as the readout, but out of the hero's
+     vertical budget — otherwise a 360 px-tall viewport could only afford an
+     ~85 px numeral. It still only renders in-session. */
+  .dd-drive > .dd-drive-main > .dd-drive-controls > [data-testid='threshold-bar'] {
+    order: 2;
+  }
+  /* Chips move from the bottom row to the header row. */
+  .dd-drive > [data-testid='status-chips'] {
+    grid-area: chips;
+    align-self: center;
+    justify-self: end;
+    margin-top: 0;
+  }
+  .dd-drive > [data-testid='fix-banner'] {
+    grid-area: bann;
+  }
+  /* The debug overlay is auto-placed, so it lands in the first free row
+     (the banner row when there is no banner, the row after it when there
+     is) and never overlaps the banner. */
+  .dd-drive > [data-testid='debug-overlay'] {
+    grid-column: 1 / -1;
+  }
+
+  /* HUD mode: header to one row, the north arrow tucks closer to the
+     readout. The mirror flip, the palette and the arrow semantics are
+     untouched — only spacing changes. */
+  .dd-hud > header {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .dd-hud > header > div:first-child {
+    flex: 1 1 auto;
+  }
+  .dd-hud [data-testid='hud-heading'] {
+    margin-top: 0.5rem;
+  }
 }

@@ -37,11 +37,22 @@ export function ThresholdBar({ limitKmh, over, speedMps, unit, onStep, onClear }
         }`}
         data-testid="threshold-label"
       >
-        {limitText === null
-          ? `line off · set from ${Math.round(convert(speedMps, unit))} ${unitName}`
-          : over
-            ? `over ${limitText}`
-            : `line ${limitText}`}
+        {limitText === null ? (
+          <>
+            line off
+            {/* Portrait keeps the "set from" hint; landscape (SPEC M2-O12)
+                drops it so the stepper stays ONE 44 px row on a 360 px-tall
+                screen — the line/over label itself is unchanged. */}
+            <span className="landscape:hidden">
+              {' '}
+              &middot; set from {Math.round(convert(speedMps, unit))} {unitName}
+            </span>
+          </>
+        ) : over ? (
+          `over ${limitText}`
+        ) : (
+          `line ${limitText}`
+        )}
       </span>
       <button type="button" aria-label="Lower the line by 10" onClick={() => onStep(-10)} className={STEP_BTN} data-testid="threshold-step-n10">
         &minus;10

@@ -209,8 +209,7 @@ export function SpeedReadout({ state, unit }: Props) {
   return (
     <div className="flex flex-col items-center" data-testid="speed-readout">
       <div
-        className={`font-semibold tabular-nums leading-none tracking-tight ${speedTone(state)}`}
-        style={{ fontSize: 'clamp(4.75rem, 33vw, 13rem)' }}
+        className={`dd-readout font-semibold tabular-nums leading-none tracking-tight ${speedTone(state)}`}
         data-testid="speed-value"
       >
         {/* Rolls only to the latest sample; a frozen STALE/LOST hold never rolls. */}
