@@ -9,19 +9,19 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- SPEC M2-O12: landscape unlocked (owner override of the M1-O6(d)
+             portrait lock). fullSensor follows the device sensor through ALL
+             four orientations, including reverse landscape, which many
+             devices refuse by default — a windshield mount can hold the phone
+             that way. It is used even when the user locked sensor rotation,
+             deliberately: the mount's physical orientation must win for a
+             driving instrument (same policy as the immersive bars, M1-O6). -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            <!-- SPEC M2-O12: landscape unlocked (owner override of the M1-O6(d)
-                 portrait lock). fullSensor follows the device sensor through ALL
-                 four orientations, including reverse landscape, which many
-                 devices refuse by default — a windshield mount can hold the phone
-                 that way. It is used even when the user locked sensor rotation,
-                 deliberately: the mount's physical orientation must win for a
-                 driving instrument (same policy as the immersive bars, M1-O6). -->
             android:screenOrientation="fullSensor"
             android:exported="true">
 
