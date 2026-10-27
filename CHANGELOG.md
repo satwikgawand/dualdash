@@ -35,6 +35,19 @@ Owner device report on v1.1 (APK 65ba72f): the scroll direction is now approved 
 - **Owner check for v1.2 (device).** Rotate the phone right → the overlay's `heading` value must INCREASE, and west must sit LEFT of north on the tape.
 
 
+### Build — landscape debug APK v1.3 (versionCode 4), 2026-10-27
+
+Release artifact for the M2-O12 landscape entry above (built from master `aa2ea9a`: 8820fcf + version-bump + manifest-parse fix).
+
+- **Name:** `dualdash-v1.3-landscape-debug.apk` — **sha256** `520d93a9cb446219cae7029b3510e01302d9c260c9e0dff1ef93b33890b5e7cf` (11,440,519 bytes, debug-signed, `com.satwik.dualdash`).
+- **Version:** versionCode **3 → 4**, versionName **"1.2" → "1.3"** (`android/app/build.gradle`); aapt badging on the APK reads `versionCode='4' versionName='1.3'`.
+- **Manifest proof (the whole point of this build):** `aapt dump xmltree <apk> AndroidManifest.xml | grep screenOrientation` → `A: android:screenOrientation(0x0101001e)=(type 0x10)0xa`. aapt prints the enum as an int: **0xa = 10 = `SCREEN_ORIENTATION_FULL_SENSOR`** — not `portrait` (that would be `0x1`, i.e. 1). Proven inside the compiled APK, not from source.
+- **Build-blocker found and fixed (`aa2ea9a`).** 8820fcf did not build: its M2-O12 spec comment sat *between attributes* inside the `<activity ...>` start tag, and XML comments may not appear there — `:app:processDebugMainManifest` died with `ManifestMerger2$MergeFailureException: Error parsing .../AndroidManifest.xml` (expat confirms: `not well-formed (invalid token): line 18, column 12`). The 345/345 suite is vitest and never parses the Android manifest, so it was green over a tree Gradle could not compile. Fix moves the comment above the tag; `android:screenOrientation="fullSensor"` is unchanged, so the orientation value above still ships exactly as M2-O12 specifies.
+- **Bundle match:** embedded `assets/public/assets/index-BY0RvGRN.js` sha `0720b4a0e0d0356cd79aabd85eb90c8e7ae78160b7384f5d655767d1c46a3f5b` (283,498 bytes) == fresh `dist/assets/index-BY0RvGRN.js` — byte-identical. Embedded `index-fcBNk2pm.css` likewise byte-identical to fresh dist.
+- **Landscape markers (grep the shipped assets, not the source):** in the embedded `assets/public/assets/index-fcBNk2pm.css`, `grep -o 'orientation:landscape'` → **2 hits**; the second block is the layout override and carries `.dd-readout` height-clamped `min(33vw,32dvh)`, the Drive four-area grid `grid-template:"head chips" "tape tape" "main main" "bann bann"`, `.dd-drive>header{flex-direction:row}`, `.dd-drive-main{flex-direction:row}`, `.dd-drive-readout`, `.dd-drive-controls`, `.dd-tape-fade`, `.dd-hud`. In the embedded sourcemap `index-BY0RvGRN.js.map`: `grep -o 'landscape:items-center'` 1 hit, `dd-drive-controls` 1, `dd-drive-main` present in the CSS block, `dd-hud` 1, `dd-tape-fade` 1, `dd-drive-readout` 1, `grep -o 'M2-O12'` **6 hits**. The media query does not appear in the JS/sourcemap text — Tailwind compiles it into the CSS asset, so that is where it was grepped.
+- **Plugins in classes*.dex (8 dex files):** keep-awake `com/getcapacitor/community/keepawake/KeepAwakePlugin` 8, `GeolocationPlugin` 29, `HapticsPlugin` 2; `assets/capacitor.plugins.json` lists keep-awake 6.0.0, geolocation 8.2.4, haptics 8.0.2; embedded `assets/capacitor.config.json` has SystemBars `hidden:true, style:DARK, insetsHandling:css, initialViewportFitValueHint:cover`.
+- **Toolchain:** JDK 21, Android SDK build-tools 36.0.0; `npm ci`, `npm run build`, `cap:sync` (all 3 plugins listed), `./gradlew assembleDebug` all exit 0. Suite **345/345** after the manifest fix. Built from `aa2ea9a` (M2-O12 tree 8820fcf + bump + manifest fix).
+
 ### Build — heading-normalized debug APK v1.2 (versionCode 3), 2026-10-27
 
 Release artifact for the M2-O11 alpha-normalization entry above (built from master d118ebc + version-bump commit).
