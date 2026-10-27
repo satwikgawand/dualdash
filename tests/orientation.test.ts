@@ -11,6 +11,7 @@ import {
   orientationHeadingFromEvent,
   orientationStatusForPermission,
 } from '../src/platform/orientation';
+import { HeadingFilter } from '../src/session/heading';
 
 /** A DOM event with the orientation payload attached (node has no ctor). */
 function orientationEvent(
@@ -30,11 +31,15 @@ describe('orientation: heading extraction from an event', () => {
     ).toBe(0);
   });
 
-  it('an absolute event reports alpha as the compass heading (Android WebView)', () => {
-    expect(orientationHeadingFromEvent({ type: 'deviceorientationabsolute', alpha: 90 })).toBe(90);
+  it('an absolute event maps alpha to the TRUE AZIMUTH — 360 − alpha (M2-O11)', () => {
+    // MDN/W3C: alpha is 0° at north and rises counter-clockwise — 90° west,
+    // 180° south, 270° east — so the clockwise azimuth is 360 − alpha.
+    expect(orientationHeadingFromEvent({ type: 'deviceorientationabsolute', alpha: 90 })).toBe(270); // top west
+    expect(orientationHeadingFromEvent({ type: 'deviceorientationabsolute', alpha: 180 })).toBe(180); // south
+    expect(orientationHeadingFromEvent({ type: 'deviceorientationabsolute', alpha: 270 })).toBe(90); // east
     expect(orientationHeadingFromEvent({ type: 'deviceorientation', absolute: true, alpha: 0 })).toBe(0);
     // Normalised into [0, 360).
-    expect(orientationHeadingFromEvent({ type: 'deviceorientationabsolute', alpha: 400 })).toBe(40);
+    expect(orientationHeadingFromEvent({ type: 'deviceorientationabsolute', alpha: 400 })).toBe(320);
   });
 
   it('a relative event carries no heading — it is never shown as a fake North', () => {
@@ -88,7 +93,7 @@ describe('orientation: availability states of the web source (M2-O9)', () => {
       orientationEvent('deviceorientationabsolute', { alpha: 123, absolute: true }),
     );
     expect(src.status()).toBe('active');
-    expect(seen).toEqual([{ headingDeg: 123, tMs: 1000 }]);
+    expect(seen).toEqual([{ headingDeg: 237, tMs: 1000 }]); // 360 − alpha, M2-O11
 
     src.stop();
     expect(src.status()).toBe('idle');
@@ -200,5 +205,79 @@ describe('orientation: environment wiring', () => {
     const env: OrientationEnvironment = { api: {}, target: new EventTarget() };
     expect(env.api).not.toBeNull();
     expect(env.target).not.toBeNull();
+  });
+});
+
+describe('orientation: true azimuth at the source (SPEC M2-O11)', () => {
+  // A 90° right turn (phone flat, north -> east) as each source really
+  // reports it. Sensor semantics, cited in SPEC M2-O11:
+  //   - deviceorientation alpha: 0° at north, INCREASES counter-clockwise
+  //     (MDN "Orientation and motion data explained"; W3C Device Orientation:
+  //     "alpha is in the opposite sense to a compass heading", compass
+  //     heading = 360 - alpha) -> a right turn delivers FALLING alpha.
+  //   - GPS course/bearing: true azimuth, 0° = true north, CLOCKWISE
+  //     (W3C Geolocation "counting clockwise relative to the true north").
+  const PHONE_TURN_RIGHT = [0, 330, 300, 270]; // raw alpha off the sensor
+  const GPS_TURN_RIGHT = [0, 30, 60, 90]; // same turn as a true azimuth
+
+  /** Sensor event -> app heading, one step. */
+  function orientationStep(alpha: number): number | null {
+    return orientationHeadingFromEvent({ type: 'deviceorientationabsolute', alpha });
+  }
+
+  it('a synthetic right turn RISES the app heading (unit proof; it FELL before the fix)', () => {
+    const headings = PHONE_TURN_RIGHT.map(orientationStep);
+    expect(headings).toEqual(GPS_TURN_RIGHT);
+    for (let i = 1; i < headings.length; i++) {
+      expect(headings[i]!).toBeGreaterThan(headings[i - 1]!); // rises turning right
+    }
+  });
+
+  it('both heading sources SIGN-AGREE through the filter on that turn', () => {
+    // Same physical turn, one filter per motion state: parked follows the
+    // phone compass (M2-O9), moving follows the GPS course (M2-O4/M2-O8).
+    // Before M2-O11 the compass fell while the GPS course rose — the sign
+    // disagreement behind "heading looks right but doesn't seem to work".
+    const tail = 20; // hold the last step so both filters converge (moving TAU 1.5 s)
+    const parked = new HeadingFilter();
+    const moving = new HeadingFilter();
+    const parkedTrace: number[] = [];
+    const movingTrace: number[] = [];
+    let t = 0;
+    for (const alpha of [...PHONE_TURN_RIGHT, ...Array(tail).fill(270)]) {
+      const out = parked.push({
+        headingDeg: null,
+        orientationDeg: orientationStep(alpha),
+        speedMps: 0,
+        tMs: t,
+      });
+      parkedTrace.push(out ?? Number.NaN);
+      t += 500;
+    }
+    t = 0;
+    for (const course of [...GPS_TURN_RIGHT, ...Array(tail).fill(90)]) {
+      const out = moving.push({
+        headingDeg: null,
+        courseDeg: course,
+        speedMps: 15,
+        tMs: t,
+      });
+      movingTrace.push(out ?? Number.NaN);
+      t += 500;
+    }
+    for (const trace of [parkedTrace, movingTrace]) {
+      for (let i = 1; i < trace.length; i++) {
+        expect(trace[i] - trace[i - 1]).toBeGreaterThanOrEqual(0); // never falls
+      }
+      expect(trace[trace.length - 1]).toBeCloseTo(90, 0); // both land on east
+    }
+    // Step for step: both agree in sign while the turn is in flight.
+    for (let i = 1; i <= PHONE_TURN_RIGHT.length; i++) {
+      const parkedD = parkedTrace[i] - parkedTrace[i - 1];
+      const movingD = movingTrace[i] - movingTrace[i - 1];
+      expect(Math.sign(parkedD)).toBe(Math.sign(movingD));
+      expect(parkedD).toBeGreaterThan(0);
+      expect(movingD).toBeGreaterThan(0);
+    }
   });
 });

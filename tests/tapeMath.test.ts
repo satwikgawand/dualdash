@@ -29,7 +29,7 @@ describe('normalizeDeg', () => {
   });
 });
 
-describe('tapeTranslateX (steady-state direction + seam continuity)', () => {
+describe('tapeTranslateX (natural compass-card direction + seam continuity)', () => {
   const PX = TAPE_PX_PER_DEG;
   const COPY = 360 * PX;
 
@@ -54,59 +54,67 @@ describe('tapeTranslateX (steady-state direction + seam continuity)', () => {
       expect((tapeItemX(h) + x) % COPY).toBeCloseTo(0, 6);
     }
     expect(tapeTranslateX(0)).toBe(0);
-    expect(tapeTranslateX(90)).toBe(90 * PX); // prev = 0 → the k = 0 copy
+    expect(tapeTranslateX(90)).toBe(-90 * PX); // prev = 0 → the k = 0 copy
   });
 
-  it('lays the rose out E-N-W: at north the 90° (E) mark sits to the LEFT of the index', () => {
-    // Worked example (SPEC M2-O10 amendment, owner device report): degrees
-    // increase to the LEFT of the fixed index, so facing north E is -405 px.
-    expect(tapeItemX(90) + tapeTranslateX(0)).toBeCloseTo(-90 * PX, 6);
+  it('lays the rose out W-N-E at north: N under the index, W LEFT, E RIGHT', () => {
+    // Acceptance worked example (SPEC M2-O11): facing north the rose reads
+    // west-north-east — west on the -45° side, east on the +45° side.
+    const at = (deg: number) => tapeItemX(deg) + tapeTranslateX(0);
+    expect(at(0)).toBeCloseTo(0, 6); // N exactly under the index
+    expect(at(-45)).toBeCloseTo(-45 * PX, 6); // W (the 315° copy): -202.5 px left
+    expect(at(315)).toBeCloseTo(-45 * PX + 360 * PX, 6); // same W tick, one copy right
+    expect(at(45)).toBeCloseTo(45 * PX, 6); // NE: +202.5 px right
+    expect(at(90)).toBeCloseTo(90 * PX, 6); // E: +405 px right
+    expect(at(-45)).toBeLessThan(at(0));
+    expect(at(90)).toBeGreaterThan(at(0)); // west left of north, east right of north
   });
 
-  it('turning right slides the tape right: the E mark sits LEFT of the index on the way in and reaches it at 90°', () => {
-    // Acceptance worked example (card t_05c7dd01): heading 90° after turning
-    // right from 0° — the 90° mark sits LEFT of the index the whole way.
+  it('turning right slides the tape LEFT: the E mark walks in from the right to the index', () => {
+    // Acceptance worked example (SPEC M2-O11): heading 90° after turning
+    // right from 0° — content slides left and the 90° mark sits RIGHT of the
+    // index the whole way in.
     const xs = thread([0, 30, 60, 90]);
-    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThan(0);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeLessThan(0);
     for (let i = 0; i < xs.length - 1; i++) {
-      expect(tapeItemX(90) + xs[i]).toBeLessThan(0); // still left of the index
+      expect(tapeItemX(90) + xs[i]).toBeGreaterThan(0); // still right of the index
     }
     expect(tapeItemX(90) + xs[xs.length - 1]).toBeCloseTo(0, 6); // E reaches index
   });
 
-  it('turning left slides the tape left', () => {
+  it('turning left slides the tape right', () => {
     const xs = thread([90, 60, 30, 0]);
-    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeLessThan(0);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThan(0);
   });
 
   it('keeps the follow continuous across the north seam when turning left (no copy-width lurch)', () => {
     // The owner bug: 5 → 355 used to jump the raw transform a whole copy-width
-    // the wrong way. Now each 1° step slides smoothly LEFT.
+    // the wrong way. Now each 1° step slides smoothly RIGHT.
     const xs = thread([5, 4, 3, 2, 1, 0, 359, 358, 357, 356, 355]);
     for (let i = 1; i < xs.length; i++) {
       const d = xs[i] - xs[i - 1];
-      expect(d).toBeLessThan(0); // heading down → content left
+      expect(d).toBeGreaterThan(0); // heading down → content right
       expect(Math.abs(d)).toBeLessThan(60); // small step, never a copy-width
     }
-    expect(xs[xs.length - 1] - xs[0]).toBeCloseTo(-10 * PX, 6); // net 10° down
+    expect(xs[xs.length - 1] - xs[0]).toBeCloseTo(10 * PX, 6); // net 10° down
   });
 
   it('keeps the follow continuous across the north seam when turning right', () => {
     const xs = thread([355, 356, 357, 358, 359, 0, 1, 2, 3, 4, 5]);
     for (let i = 1; i < xs.length; i++) {
       const d = xs[i] - xs[i - 1];
-      expect(d).toBeGreaterThan(0); // heading up → content right
-      expect(Math.abs(d)).toBeLessThan(60);
+      expect(d).toBeLessThan(0); // heading up → content left
+      expect(Math.abs(d)).toBeLessThan(60); // small step, never a copy-width
     }
-    expect(xs[xs.length - 1] - xs[0]).toBeCloseTo(10 * PX, 6);
+    expect(xs[xs.length - 1] - xs[0]).toBeCloseTo(-10 * PX, 6);
   });
 
-  it('a full net right turn stays continuous: every 10° step slides ~45 px right, seam included', () => {
+  it('a full net right turn stays continuous: every 10° step slides ~45 px left, seam included', () => {
     const hs = [...Array.from({ length: 36 }, (_, i) => i * 10), 0]; // 0,10,…,350, back to 0
     const xs = thread(hs);
     for (let i = 1; i < xs.length; i++) {
       const d = xs[i] - xs[i - 1];
-      expect(d).toBeGreaterThan(0); // a right turn never slides content left
+      expect(d).toBeLessThan(0); // a right turn never slides content right
       expect(Math.abs(d)).toBeCloseTo(10 * PX, 6); // 45 px, including the seam step
     }
   });
@@ -180,8 +188,9 @@ describe('tapeItems (three-copy seamless tape)', () => {
     expect(northLabel?.label).toBe('N');
   });
 
-  it('places items linearly (mirrored, M2-O10) so a translate is the only moving part', () => {
-    expect(tapeItemX(45)).toBe(-45 * TAPE_PX_PER_DEG);
+  it('places items linearly (natural W-N-E, M2-O11) so a translate is the only moving part', () => {
+    expect(tapeItemX(45)).toBe(45 * TAPE_PX_PER_DEG);
+    expect(tapeItemX(90)).toBeGreaterThan(tapeItemX(0)); // east right of north
     expect(tapeItemX(-45)).toBe(-tapeItemX(45));
   });
 });

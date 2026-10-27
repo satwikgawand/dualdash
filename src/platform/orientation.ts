@@ -6,8 +6,11 @@
 //
 // Order chosen by the card, with the compatibility evidence behind it:
 //   (a) the platform Web API — `deviceorientationabsolute` (Android Chrome /
-//       Android WebView deliver an absolute alpha = compass heading) with
-//       `webkitCompassHeading` as the WebKit/iOS fallback. Zero dependencies,
+//       Android WebView deliver an absolute alpha) with `webkitCompassHeading`
+//       as the WebKit/iOS fallback. Alpha is converted to the app's single
+//       convention — the true azimuth — inside `orientationHeadingFromEvent`
+//       (SPEC M2-O11): alpha counts counter-clockwise, the azimuth clockwise.
+//       Zero dependencies,
 //       no plugin to keep Capacitor-8 compatible, and the app is Android-only
 //       for v1 (SPEC M1-O3).
 //   (b) @capacitor-community/sensors ONLY if (a) proves insufficient in the
@@ -40,7 +43,7 @@ export type OrientationStatus =
   | 'unavailable';
 
 export interface OrientationReading {
-  /** Compass heading in degrees [0, 360), 0 = north. */
+  /** True azimuth in degrees [0, 360): 0 = true north, rising clockwise. */
   headingDeg: number;
   /** Monotonic milliseconds (the staleness clock in useSpeed). */
   tMs: number;
@@ -61,7 +64,10 @@ export interface OrientationSource {
  * so the heading maths is testable in the node suite without a DOM.
  */
 export interface OrientationEventLike {
-  /** Z rotation in degrees; absolute events carry the compass heading. */
+  /**
+   * Z rotation in degrees. Counter-clockwise: the compass heading is
+   * (360 − alpha), never alpha itself (SPEC M2-O11).
+   */
   alpha?: number | null;
   /** True when alpha is in the Earth frame (a real heading). */
   absolute?: boolean;
@@ -77,12 +83,26 @@ function normalizeDeg(deg: number): number {
 
 /**
  * Heading from one orientation event, or null when the event carries no
- * Earth-frame heading (SPEC M2-O9).
+ * Earth-frame heading (SPEC M2-O9). Normalized ONCE, here, to the single
+ * app convention: the true azimuth — 0° = true north, increasing CLOCKWISE
+ * (SPEC M2-O11).
  *
- * Priority: `webkitCompassHeading` (WebKit reports the compass directly),
- * else `alpha` when the event is absolute — Android WebView's
- * `deviceorientationabsolute` reports alpha as the compass heading. A
- * relative event is the phone's attitude inside its own frame, NOT a
+ * Priority: `webkitCompassHeading` (WebKit reports the compass directly:
+ * degrees clockwise from north, i.e. already a true azimuth), else `alpha`
+ * when the event is absolute — Android WebView's `deviceorientationabsolute`
+ * reports alpha as the rotation about the earth Z axis, which is NOT a
+ * compass heading. The W3C Device Orientation specification says so
+ * explicitly — the chosen angles mean "alpha is in the opposite sense to a
+ * compass heading" — and its worked example converts it as
+ * `heading = 360 - alpha` (a device flat with its top pointing west reads
+ * alpha 90, heading 270). MDN states the same mapping numerically: alpha is
+ * 0° at north and INCREASES COUNTER-CLOCKWISE — 90° west, 180° south,
+ * 270° east. The GPS path (coords.heading / Location.getBearing / the
+ * derived course) is already clockwise-from-true-north, so this one
+ * conversion makes the two sources sign-agree — before it, a right turn
+ * RAISED the GPS heading and FELL the compass heading (M2-O11).
+ *
+ * A relative event is the phone's attitude inside its own frame, NOT a
  * heading: it is dropped rather than shown as a fake North.
  */
 export function orientationHeadingFromEvent(e: OrientationEventLike): number | null {
@@ -95,7 +115,7 @@ export function orientationHeadingFromEvent(e: OrientationEventLike): number | n
   const absolute = e.type === 'deviceorientationabsolute' || e.absolute === true;
   if (!absolute) return null;
   if (typeof e.alpha !== 'number' || !Number.isFinite(e.alpha)) return null;
-  return normalizeDeg(e.alpha);
+  return normalizeDeg(360 - e.alpha); // counter-clockwise alpha -> true azimuth (M2-O11)
 }
 
 /** Map a permission result onto the availability state (never a fake 'active'). */

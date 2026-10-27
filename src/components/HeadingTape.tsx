@@ -4,12 +4,14 @@
 // under a fixed centre index, so the heading you are on is always in the
 // middle and the horizon scrolls past as you turn.
 //
-// Scroll direction is the owner-corrected compass-card direction (SPEC
-// M2-O10, amended): the rose reads E-N-W (degrees increase to the LEFT of
-// the index), so a rising heading slides the strip RIGHT and a falling one
-// slides it LEFT — the mark you turn toward walks in from the LEFT edge to
-// the index. The follow stays continuous across the 0°/360° seam so a north
-// crossing never lurches the tape a whole copy-width the wrong way.
+// Scroll direction is the natural compass-card direction (SPEC M2-O10 seam
+// rule; rose restored by M2-O11): the rose reads W-N-E (degrees increase to
+// the RIGHT of the index), so a rising heading slides the strip LEFT and a
+// falling one slides it RIGHT — the mark you turn toward walks in from the
+// RIGHT edge to the index. The heading data is a true azimuth, normalised
+// once at the source (M2-O11), so the rose needs no display mirror. The
+// follow stays continuous across the 0°/360° seam so a north crossing never
+// lurches the tape a whole copy-width the wrong way.
 //
 // The strip is drawn three times (-360°, 0°, +360°), so the visible window
 // never reaches the 0°/360° seam: the wrap is seamless by construction and
@@ -68,12 +70,12 @@ export function HeadingTape({
   const quiet = suppressed || dimmed;
 
   // Seam-safe follow (SPEC M2-O10). The pipeline heading wraps into [0, 360),
-  // so a naive heading·px-per-deg transform jumps a whole copy-width at every
+  // so a naive -heading·px-per-deg transform jumps a whole copy-width at every
   // north crossing and the 250 ms CSS transition lurches the tape the wrong
   // way (owner report: "when I move left, it scrolls left"). Instead we keep
   // the RAW transform continuous by picking the tape copy nearest the previous
-  // frame, so a turn always slides content the owner-corrected way — heading
-  // up -> content right, heading down -> content left — including across the
+  // frame, so a turn always slides content the compass-card way — heading up
+  // -> content left, heading down -> content right — including across the
   // seam. A rare whole-copy fold (visually identical) stops a long net turn from
   // walking the window off the drawn copies; it is applied with the follow
   // transition suppressed so it never shows as motion. The previous translate
