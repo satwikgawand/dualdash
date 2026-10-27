@@ -17,7 +17,9 @@ import {
 import { SpeedSource } from './platform/SpeedSource';
 import './index.css';
 
-// A gentle synthetic drive for browser dev: accelerates, cruises, decelerates.
+// A gentle synthetic drive for browser dev: accelerates, cruises through a
+// left-hand bend (so the heading tape scrolls in the dev build too), then
+// decelerates.
 function devTrace(): MockPoint[] {
   const pts: MockPoint[] = [];
   let lat = 12.9716;
@@ -29,15 +31,15 @@ function devTrace(): MockPoint[] {
     lat += 0.00009;
     t += 1000;
   }
-  // cruise 25 m/s for 30 s
+  // cruise 25 m/s for 30 s, turning from east to south-west
   for (let i = 0; i < 30; i++) {
-    pts.push({ tMs: t, speedMps: 25, lat, lon, headingDeg: 90 });
+    pts.push({ tMs: t, speedMps: 25, lat, lon, headingDeg: 90 + i * 3 });
     lat += 0.00022;
     t += 1000;
   }
   // decelerate 25 -> 0 over 25 s
   for (let i = 0; i < 25; i++) {
-    pts.push({ tMs: t, speedMps: 25 - i, lat, lon, headingDeg: 90 });
+    pts.push({ tMs: t, speedMps: 25 - i, lat, lon, headingDeg: 180 + i });
     lat += 0.00009;
     t += 1000;
   }

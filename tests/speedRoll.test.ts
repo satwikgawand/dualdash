@@ -6,11 +6,22 @@ import {
   MIN_DIGIT_SLOTS,
   ROLL_DURATION_MS,
   ROLL_EASING,
+  ROLL_MAX_INDEX,
+  ROLL_MIN_INDEX,
+  ROLL_RECENTRE_GRACE_MS,
+  ROLL_REST_BASE,
   ROLL_STAGGER_MS,
+  ROLL_STRIP_CELLS,
+  digitDelta,
   digitTransition,
   maxSettleMs,
+  recenterRollPosition,
+  rollDirection,
+  rollStripCells,
+  rollTransform,
   roundSpeed,
   speedDigitSlots,
+  stepRollPosition,
 } from '../src/components/speedRoll';
 
 describe('roundSpeed', () => {
@@ -109,5 +120,158 @@ describe('digitTransition (reduced motion + freeze mapping)', () => {
     expect(maxSettleMs(MIN_DIGIT_SLOTS)).toBeLessThan(1000);
     expect(maxSettleMs(4)).toBeLessThan(1000);
     expect(maxSettleMs(1)).toBe(ROLL_DURATION_MS);
+  });
+});
+
+describe('rollDirection (SPEC M2-O5: the strip follows the speed change)', () => {
+  it('rolls up while accelerating and down while decelerating', () => {
+    expect(rollDirection(16.3, 16.7)).toBe('up'); // 59 -> 60 km/h
+    expect(rollDirection(16.9, 16.7)).toBe('down'); // 61 -> 60 km/h
+  });
+
+  it('is neutral when nothing moves (first paint, held speed)', () => {
+    expect(rollDirection(null, 20)).toBe('neutral'); // first paint: no spin
+    expect(rollDirection(20, 20)).toBe('neutral');
+  });
+
+  it('is neutral for defensive garbage instead of guessing', () => {
+    expect(rollDirection(Number.NaN, 20)).toBe('neutral');
+    expect(rollDirection(20, Number.POSITIVE_INFINITY)).toBe('neutral');
+  });
+});
+
+describe('digitDelta (direction-aware travel through the 9 <-> 0 seam)', () => {
+  it('accelerating 9 -> 0 climbs ONE cell (the owner-reported case)', () => {
+    expect(digitDelta(9, 0, 'up')).toBe(1);
+  });
+
+  it('decelerating 1 -> 0 and 0 -> 9 descend through the seam', () => {
+    expect(digitDelta(1, 0, 'down')).toBe(-1);
+    expect(digitDelta(0, 9, 'down')).toBe(-1);
+  });
+
+  it('accelerating 0 -> 9 climbs the long way, never backwards', () => {
+    expect(digitDelta(0, 9, 'up')).toBe(9);
+  });
+
+  it('an unchanged digit does not move', () => {
+    expect(digitDelta(7, 7, 'up')).toBe(0);
+    expect(digitDelta(7, 7, 'down')).toBe(0);
+  });
+
+  it('neutral takes the shortest path, ties climb', () => {
+    expect(digitDelta(0, 9, 'neutral')).toBe(-1);
+    expect(digitDelta(9, 0, 'neutral')).toBe(1);
+    expect(digitDelta(0, 4, 'neutral')).toBe(4);
+    expect(digitDelta(0, 6, 'neutral')).toBe(-4);
+    expect(digitDelta(0, 5, 'neutral')).toBe(5);
+  });
+});
+
+describe('roll positions (strip stepping, wraps, recentre)', () => {
+  const cells = rollStripCells();
+
+  it('draws three copies of 0-9 plus the closing 0', () => {
+    expect(ROLL_STRIP_CELLS).toBe(31);
+    expect(cells).toHaveLength(31);
+    expect(cells.slice(0, 11)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+    expect(cells[ROLL_MIN_INDEX]).toBe(0);
+    expect(cells[ROLL_MAX_INDEX]).toBe(9);
+    expect(rollTransform(13)).toBe('translateY(-13em)');
+  });
+
+  it('59 -> 60 accelerating: every strip climbs, the ones digit wraps UP', () => {
+    const from = speedDigitSlots(59 / 3.6, 'kmh'); // [0, 5, 9]
+    const to = speedDigitSlots(60 / 3.6, 'kmh'); // [0, 6, 0]
+    const dir = rollDirection(59 / 3.6, 60 / 3.6);
+    let pos = from.map((d) => ROLL_REST_BASE + d);
+    pos = pos.map((p, i) => stepRollPosition(p, to[i], dir));
+    expect(from).toEqual([0, 5, 9]);
+    expect(to).toEqual([0, 6, 0]);
+    // Accelerating: no strip descends (each one climbs or holds)...
+    expect(pos.every((p, i) => p >= ROLL_REST_BASE + from[i])).toBe(true);
+    // ...and the ones strip climbs exactly one cell through the seam.
+    expect(pos[2] - (ROLL_REST_BASE + 9)).toBe(1);
+    expect(pos.map((p) => cells[p % 10])).toEqual(to);
+    expect(recenterRollPosition(pos[2])).toBe(ROLL_REST_BASE);
+  });
+
+  it('61 -> 60 decelerating: the ones strip descends through the seam', () => {
+    const from = speedDigitSlots(61 / 3.6, 'kmh'); // [0, 6, 1]
+    const to = speedDigitSlots(60 / 3.6, 'kmh'); // [0, 6, 0]
+    const dir = rollDirection(61 / 3.6, 60 / 3.6);
+    const start = from.map((d) => ROLL_REST_BASE + d);
+    const pos = start.map((p, i) => stepRollPosition(p, to[i], dir));
+    expect(pos).toEqual([ROLL_REST_BASE, ROLL_REST_BASE + 6, ROLL_REST_BASE]);
+    expect(pos.map((p) => cells[p % 10])).toEqual(to);
+  });
+
+  it('jumps of any size roll in the travel direction only', () => {
+    // 12 -> 99 km/h accelerating: both strips climb.
+    const upFrom = speedDigitSlots(12 / 3.6, 'kmh'); // [0, 1, 2]
+    const upTo = speedDigitSlots(99 / 3.6, 'kmh'); // [0, 9, 9]
+    const up = rollDirection(12 / 3.6, 99 / 3.6);
+    expect(up).toBe('up');
+    const upPos = upFrom.map((d, i) =>
+      stepRollPosition(ROLL_REST_BASE + d, upTo[i], up),
+    );
+    expect(upPos[1]).toBe(ROLL_REST_BASE + 9); // 1 -> 9 climbs 8 cells
+    expect(upPos[2]).toBe(ROLL_REST_BASE + 9); // 2 -> 9 climbs 7 cells
+    expect(upPos.map((p) => cells[p % 10])).toEqual(upTo);
+
+    // 99 -> 12 km/h decelerating: both strips descend.
+    const down = rollDirection(99 / 3.6, 12 / 3.6);
+    expect(down).toBe('down');
+    const downPos = [ROLL_REST_BASE + 0, ROLL_REST_BASE + 9, ROLL_REST_BASE + 9].map(
+      (p, i) => stepRollPosition(p, upFrom[i], down),
+    );
+    expect(downPos).toEqual([ROLL_REST_BASE, ROLL_REST_BASE + 1, ROLL_REST_BASE + 2]);
+    expect(downPos.map((p) => cells[p % 10])).toEqual(upFrom);
+  });
+
+  it('a unit toggle takes the shortest path, then direction resumes', () => {
+    const mps = 100 / 3.6; // 100 km/h == 62 mph
+    // The toggle redraws the field with no speed change: neutral, no spin.
+    expect(rollDirection(mps, mps)).toBe('neutral');
+    const kmh = speedDigitSlots(mps, 'kmh'); // [1, 0, 0]
+    const mph = speedDigitSlots(mps, 'mph'); // [0, 2, 6]
+    const dir = rollDirection(mps, mps);
+    const toggled = kmh.map((d, i) => stepRollPosition(ROLL_REST_BASE + d, mph[i], dir));
+    expect(toggled.map((p) => cells[p % 10])).toEqual(mph);
+    for (let i = 1; i < toggled.length; i++) {
+      expect(Math.abs(toggled[i] - (ROLL_REST_BASE + kmh[i]))).toBeLessThanOrEqual(5);
+    }
+    // Accelerating after the toggle rolls up in the new unit again.
+    expect(rollDirection(mps, mps + 0.5)).toBe('up');
+  });
+
+  it('recentres into the middle copy without changing the digit', () => {
+    for (let p = 0; p < ROLL_STRIP_CELLS; p++) {
+      const r = recenterRollPosition(p);
+      expect(r).toBeGreaterThanOrEqual(ROLL_MIN_INDEX);
+      expect(r).toBeLessThanOrEqual(ROLL_MAX_INDEX);
+      expect(r % 10).toBe(p % 10);
+    }
+  });
+
+  it('never walks off the strip: a 200-step drive stays in range and honest', () => {
+    let mps = 0;
+    let pos = ROLL_REST_BASE; // ones digit at 0
+    for (let step = 0; step < 200; step++) {
+      const next = mps + (step % 2 === 0 ? 0.4 : -0.15); // up, up, down, ...
+      const dir = rollDirection(mps, next);
+      const digit = speedDigitSlots(next, 'kmh')[2];
+      pos = recenterRollPosition(stepRollPosition(pos, digit, dir));
+      expect(pos).toBeGreaterThanOrEqual(0);
+      expect(pos).toBeLessThan(ROLL_STRIP_CELLS);
+      expect(cells[pos]).toBe(digit);
+      mps = next;
+    }
+  });
+
+  it('the recentre fires after the roll settles and stays inside the 1 Hz tick', () => {
+    expect(ROLL_DURATION_MS + MIN_DIGIT_SLOTS * ROLL_STAGGER_MS + ROLL_RECENTRE_GRACE_MS).toBeLessThan(
+      1000,
+    );
   });
 });

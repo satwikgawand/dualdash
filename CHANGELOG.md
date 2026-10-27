@@ -4,6 +4,17 @@ All notable changes to DualDash are documented here. Format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added — M2 polish: direction-aware roll, heading tape, production visual pass (2026-10-26)
+
+The readout, the compass and the whole Drive/HUD surface in one visual language. Realtime-only scope (M1-O5) unchanged: nothing is stored, nothing added to `src/core`, zero new dependencies.
+
+- **Direction-aware odometer** (M2-O5). Digit strips now roll with the speed change: accelerating, the ones column climbs through the 9 → 0 seam (59 → 60 rolls **up** one cell); decelerating, it descends (61 → 60 rolls **down**). Fixes the owner-reported spin-backwards artifact. The strip is drawn 31 cells (three copies of 0-9 plus the closing 0) and recentred at rest with an invisible ±10-cell jump. First paint, an unchanged speed and a km/h ↔ mph toggle stay motion-free; freeze (STALE/LOST), reduced motion and the 3-slot tabular field are unchanged.
+- **Heading tape** (M2-O6). The Drive-mode compass ring is replaced by a full-width scrolling tape: ticks every 10°, the full 8-point rose labelled every 45°, a fixed centre index in the signal accent, edge fade, "N 354°" readout, ~±45° of horizon at 320–412 px. Seamless by duplication (the rose is drawn three times; the track is translated), ~250 ms follow. Below 3 m/s it dims to "— heading —"; HUD keeps its small arrow. `CompassRing.tsx` removed.
+- **Production visual pass** (M2-O7). Design tokens (`--dd-*`: bg, surface, border, three text levels and ONE signal accent #ff9d2e for over-limit, edge flash, live-session dot and location problems), typographic hierarchy (dominant readout → stats → uppercase letter-spaced micro-labels), 4 px spacing scale, designed controls (44 px `dd-btn` family: solid primary for START/RESUME, accent STOP, quiet steppers; pill chips; summary card with ✕ + Done; calm suggestion invite) and micro-motion (240 ms rise-in, pulsing live dot, thinner 2 px / faster 700 ms edge flash), all disabled under `prefers-reduced-motion`.
+- **Hidden diagnostics.** The drive-test overlay no longer ships on screen: five taps on the status/chip row (within 3 s) toggle it. RAM-only, so it hides again on reload. Every M1-O4/M1-O7 field is still there.
+- **Tests.** 209 → **241 / 241** (15 files): roll direction incl. the 59→60 / 61→60 wraps, both-sign jumps and the unit toggle; strip recentre invariants over a 200-step drive; heading-tape wrap, scale and labels; the 5-tap gate window.
+- **Browser matrix re-verified** at 320/360/375/412 px: no horizontal scroll, every control ≥ 44 px, overlay hidden by default, tape full-bleed, reduced-motion honoured.
+
 ### Added — Milestone 2 (2026-10-26)
 
 Session stats, an over-speed alert and a rotating compass — all RAM-only; the realtime-only scope (M1-O5) holds.

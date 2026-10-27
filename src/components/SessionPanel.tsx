@@ -1,11 +1,11 @@
-// SessionPanel: the M2 session controls in Drive mode (SPEC M2-O1/O2).
-// Everything sits in normal document flow — a chip, never an overlay — so
-// one glance reads one meaning:
-//   idle   -> quiet [Start session] (or the suggestion chip while the
-//              nag guard allows it)
-//   running -> live stats row + [Stop]
+// SessionPanel: the M2 session controls in Drive mode (SPEC M2-O1/O2,
+// restyled M2-O7). Everything sits in normal document flow — a chip, never
+// an overlay — so one glance reads one meaning:
+//   idle   -> one clear [Start session] (or the suggestion chip while the
+//              nag guard allows it: a calm invite, not a prompt)
+//   running -> live stats row + the pulsing live dot + [Stop]
 //   paused  -> PAUSED badge + [Resume] + [Stop]
-//   summary -> the frozen card until [Done]
+//   summary -> the summary card until [Done] or the ✕
 // State is RAM-only: it resets on reload (SPEC M1-O5).
 
 import { Unit, convert, unitLabel } from '../core/units';
@@ -34,13 +34,15 @@ function Stat({
   big?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 flex-col items-center">
+    <div className="flex min-w-0 flex-col items-center gap-1">
       <span
-        className={`tabular-nums ${big ? 'text-2xl' : 'text-base'} font-semibold text-neutral-100`}
+        className={`tabular-nums font-semibold text-[var(--dd-text-1)] ${
+          big ? 'text-3xl' : 'text-xl'
+        }`}
       >
         {value}
       </span>
-      <span className="text-[11px] text-neutral-500">{caption}</span>
+      <span className="dd-micro">{caption}</span>
     </div>
   );
 }
@@ -50,7 +52,7 @@ function StatsGrid({ stats, unit, big }: { stats: SessionStats; unit: Unit; big?
   const unitName = unitLabel(unit);
   return (
     <div
-      className={`grid grid-cols-4 items-end gap-2 ${big ? 'gap-3' : ''}`}
+      className={`grid grid-cols-4 items-end ${big ? 'gap-3' : 'gap-2'}`}
       data-testid="session-stats"
     >
       <Stat value={formatDistance(stats.distanceM, unit)} caption="distance" big={big} />
@@ -69,9 +71,6 @@ function StatsGrid({ stats, unit, big }: { stats: SessionStats; unit: Unit; big?
   );
 }
 
-const BTN_BASE =
-  'inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-bold';
-
 export function SessionPanel({
   unit,
   session,
@@ -82,18 +81,18 @@ export function SessionPanel({
   onAcceptSuggestion,
   onDismissSuggestion,
 }: Props) {
-  // Suggestion chip (SPEC M2-O2): inline, non-blocking, exactly one meaning.
+  // Suggestion chip (SPEC M2-O2): inline, non-blocking, a calm invite.
   if (session.phase === 'idle' && session.suggestVisible) {
     return (
       <div
-        className="flex items-center justify-center gap-2 rounded-full bg-neutral-800 py-1.5 pl-4 pr-1.5"
+        className="dd-rise flex items-center justify-center gap-2 self-center rounded-full border border-[var(--dd-border)] bg-[var(--dd-surface)] py-1.5 pl-4 pr-1.5"
         data-testid="suggest-chip"
       >
-        <span className="text-sm font-semibold text-neutral-100">Start session?</span>
+        <span className="text-sm text-[var(--dd-text-2)]">Start a session?</span>
         <button
           type="button"
           onClick={onAcceptSuggestion}
-          className={`${BTN_BASE} bg-emerald-600 text-white active:bg-emerald-500`}
+          className="dd-btn dd-btn-primary px-4 text-sm"
           data-testid="suggest-start"
         >
           Start
@@ -102,7 +101,7 @@ export function SessionPanel({
           type="button"
           onClick={onDismissSuggestion}
           aria-label="Do not suggest a session again"
-          className={`${BTN_BASE} min-w-11 bg-neutral-700 px-3 text-neutral-200 active:bg-neutral-600`}
+          className="dd-btn dd-btn-quiet px-3"
           data-testid="suggest-dismiss"
         >
           &times;
@@ -117,7 +116,7 @@ export function SessionPanel({
         <button
           type="button"
           onClick={onStart}
-          className={`${BTN_BASE} border border-neutral-700 font-semibold text-neutral-300 active:bg-neutral-900`}
+          className="dd-btn dd-btn-primary"
           data-testid="session-start"
         >
           Start session
@@ -128,16 +127,24 @@ export function SessionPanel({
 
   if (session.phase === 'summary' && session.summary) {
     return (
-      <div
-        className="session-summary rounded-xl border border-neutral-800 bg-neutral-900 p-4"
-        data-testid="session-summary"
-      >
-        <div className="mb-3 text-sm font-semibold text-neutral-300">Session summary</div>
+      <div className="dd-rise dd-card p-4" data-testid="session-summary">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="dd-micro">Session summary</span>
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss the session summary"
+            className="dd-btn dd-btn-quiet -mr-2 px-3"
+            data-testid="session-summary-close"
+          >
+            &times;
+          </button>
+        </div>
         <StatsGrid stats={session.summary} unit={unit} big />
         <button
           type="button"
           onClick={onDismiss}
-          className={`${BTN_BASE} mt-4 w-full bg-neutral-800 text-neutral-100 active:bg-neutral-700`}
+          className="dd-btn dd-btn-quiet mt-4 w-full"
           data-testid="session-done"
         >
           Done
@@ -152,18 +159,21 @@ export function SessionPanel({
       <StatsGrid stats={session.stats} unit={unit} />
       <div className="flex flex-wrap items-center justify-center gap-2">
         {paused ? (
-          <span
-            className="inline-flex min-h-11 items-center rounded-full bg-amber-600 px-4 text-sm font-bold text-black"
-            data-testid="session-paused-badge"
-          >
-            PAUSED
+          <span className="dd-pill" data-testid="session-paused-badge">
+            <span className="h-2 w-2 rounded-full border border-[var(--dd-text-2)]" aria-hidden="true" />
+            paused
           </span>
-        ) : null}
+        ) : (
+          <span className="dd-pill" data-testid="session-live-badge">
+            <span className="dd-live-dot" aria-hidden="true" />
+            live
+          </span>
+        )}
         {paused ? (
           <button
             type="button"
             onClick={onResume}
-            className={`${BTN_BASE} bg-emerald-600 text-white active:bg-emerald-500`}
+            className="dd-btn dd-btn-primary"
             data-testid="session-resume"
           >
             Resume
@@ -172,7 +182,7 @@ export function SessionPanel({
         <button
           type="button"
           onClick={onStop}
-          className={`${BTN_BASE} border border-red-950 bg-red-950/60 text-red-300 active:bg-red-900/60`}
+          className="dd-btn dd-btn-signal"
           data-testid="session-stop"
         >
           Stop

@@ -1,8 +1,9 @@
-// ThresholdBar: the in-session over-speed line (SPEC M2-O3). Shows the
-// limit on the readout and the quick stepper (+/-5, +/-10, clear) in the
-// same quiet row as everything else in Drive mode — no dialogs, no modals.
-// The line itself turns red while over; the buzz and the edge flash are
-// owned by the data layer, not this component.
+// ThresholdBar: the in-session over-speed line (SPEC M2-O3, restyled
+// M2-O7). Shows the limit on the readout and the quick stepper (+/-5,
+// +/-10, clear) as quiet 44 px pill controls in the same calm row as
+// everything else in Drive mode — no dialogs, no modals. The label turns
+// signal-accent while over; the buzz and the edge flash are owned by the
+// data layer, not this component.
 
 import { Unit, convert, unitLabel } from '../core/units';
 
@@ -17,8 +18,7 @@ interface Props {
   onClear: () => void;
 }
 
-const STEP_BTN =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-neutral-800 px-2 text-sm font-bold tabular-nums text-neutral-200 active:bg-neutral-700';
+const STEP_BTN = 'dd-btn dd-btn-quiet px-2.5 text-xs tabular-nums';
 
 export function ThresholdBar({ limitKmh, over, speedMps, unit, onStep, onClear }: Props) {
   const unitName = unitLabel(unit);
@@ -32,16 +32,16 @@ export function ThresholdBar({ limitKmh, over, speedMps, unit, onStep, onClear }
       data-over={String(over)}
     >
       <span
-        className={`mr-1 text-sm font-bold tabular-nums ${
-          over ? 'text-red-300' : limitText ? 'text-amber-300' : 'text-neutral-500'
+        className={`dd-micro mr-1 tabular-nums ${
+          over ? 'text-[var(--dd-accent)]' : 'text-[var(--dd-text-2)]'
         }`}
         data-testid="threshold-label"
       >
         {limitText === null
-          ? `Line off — set from ${Math.round(convert(speedMps, unit))} ${unitName}`
+          ? `line off · set from ${Math.round(convert(speedMps, unit))} ${unitName}`
           : over
-            ? `Over ${limitText}`
-            : `Line ${limitText}`}
+            ? `over ${limitText}`
+            : `line ${limitText}`}
       </span>
       <button type="button" aria-label="Lower the line by 10" onClick={() => onStep(-10)} className={STEP_BTN} data-testid="threshold-step-n10">
         &minus;10
@@ -59,7 +59,7 @@ export function ThresholdBar({ limitKmh, over, speedMps, unit, onStep, onClear }
         type="button"
         aria-label="Clear the speed line"
         onClick={onClear}
-        className={`${STEP_BTN} text-neutral-400`}
+        className="dd-btn dd-btn-quiet px-2.5 text-xs"
         data-testid="threshold-clear"
       >
         &times;

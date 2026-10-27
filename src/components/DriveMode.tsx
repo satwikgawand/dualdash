@@ -1,13 +1,13 @@
-// Drive mode: the glanceable dashboard. Huge primary speed, accuracy chip,
-// unit + mode toggles. Realtime-only: no counters, no controls that persist
-// anything (SPEC M1-O5). Mobile-first, >=44px targets, no horizontal scroll.
-// The debug overlay (SPEC O4) carries the drive-test instrumentation:
-// raw vs smoothed speed, fix state, fix interval.
+// Drive mode: the glanceable dashboard. Heading tape across the top, huge
+// primary speed, session controls, chips. Realtime-only: no counters, no
+// controls that persist anything (SPEC M1-O5). Mobile-first, >=44px targets,
+// no horizontal scroll.
 //
-// M2 surfaces (all in normal flow — a chip or a row, never a popup):
-// the over-speed line + stepper under the readout (in-session only), the
-// rotating compass (replaces the text heading), and the session panel
-// (start/stop/pause/summary + the exactly-once suggestion chip).
+// Visual language (SPEC M2-O7): one dark surface system, one signal accent,
+// a typographic hierarchy (readout > stats > micro-labels) and controls as
+// designed components. The drive-test overlay (SPEC O4) is HIDDEN by default
+// and opens on five taps on the status/chip row — the app ships looking like
+// an instrument, not a debug screen. RAM-only, like everything else.
 
 import { SpeedViewModel } from '../state/useSpeed';
 import {
@@ -16,10 +16,11 @@ import {
   SpeedReadout,
   StationaryChip,
 } from './readout';
-import { CompassRing } from './CompassRing';
+import { HeadingTape } from './HeadingTape';
 import { SessionPanel } from './SessionPanel';
 import { ThresholdBar } from './ThresholdBar';
 import { ToggleBar } from './ToggleBar';
+import { useDebugGate } from './debugGate';
 
 interface Props {
   vm: SpeedViewModel;
@@ -28,13 +29,32 @@ interface Props {
 export function DriveMode({ vm }: Props) {
   const session = vm.m2.session;
   const inSession = session.phase === 'running' || session.phase === 'paused';
-  return (
-    <div className="flex min-h-dvh w-full flex-col gap-4 bg-neutral-950 p-4 text-white">
-      <ToggleBar vm={vm} />
+  const { revealed, onGateTap, hide } = useDebugGate();
 
-      <div className="flex flex-col items-center gap-2 py-2">
+  return (
+    <div
+      className="flex min-h-dvh w-full flex-col gap-3 px-4 pb-4 text-[var(--dd-text-1)]"
+      data-testid="drive-root"
+    >
+      <header className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="dd-micro tracking-[0.22em]">DualDash</span>
+          <ToggleBar vm={vm} variant="unit" />
+        </div>
+        <ToggleBar vm={vm} variant="mode" />
+      </header>
+
+      {/* Compass: a full-width tape under a fixed index (SPEC M2-O6).
+          `dimmed` keeps a STALE/LOST hold from reading as live data. */}
+      <HeadingTape
+        headingDeg={vm.m2.headingDeg}
+        suppressed={vm.m2.headingSuppressed}
+        dimmed={vm.state.fixState !== 'LIVE'}
+      />
+
+      <div className="flex flex-col items-center gap-3 pt-1">
         <SpeedReadout state={vm.state} unit={vm.unit} />
-        {/* The over-speed line sits on the readout, in-session only (M2-O3). */}
+        {/* The over-speed line sits under the readout, in-session only (M2-O3). */}
         {inSession ? (
           <ThresholdBar
             limitKmh={vm.m2.alertLimitKmh}
@@ -45,19 +65,6 @@ export function DriveMode({ vm }: Props) {
             onClear={vm.m2Actions.clearLimit}
           />
         ) : null}
-      </div>
-
-      {/* Compass: the ring rotates under the fixed index mark (SPEC M2-O4). */}
-      <div className="flex justify-center">
-        <CompassRing
-          headingDeg={vm.m2.headingDeg}
-          suppressed={vm.m2.headingSuppressed}
-        />
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <AccuracyChip state={vm.state} />
-        <StationaryChip state={vm.state} />
       </div>
 
       <SessionPanel
@@ -71,14 +78,30 @@ export function DriveMode({ vm }: Props) {
         onDismissSuggestion={vm.m2Actions.dismissSuggestion}
       />
 
+      {/* Status/chip row: also the hidden diagnostics gate (SPEC M2-O7).
+          Five taps inside three seconds flip the drive-test overlay. */}
+      <div
+        className="mt-auto flex flex-wrap items-center justify-center gap-2 pt-1"
+        onClick={onGateTap}
+        data-testid="status-chips"
+      >
+        <AccuracyChip state={vm.state} />
+        <StationaryChip state={vm.state} />
+      </div>
+
       <FixBanner state={vm.state} chip={vm.chip} onAction={vm.allowLocation} />
 
-      <DebugOverlay vm={vm} />
+      {revealed ? <DebugOverlay vm={vm} onHide={hide} /> : null}
     </div>
   );
 }
 
-function DebugOverlay({ vm }: { vm: SpeedViewModel }) {
+/**
+ * The drive-test overlay (SPEC O4 / M1-O7 diagnostics), restyled as a card
+ * and hidden until the gate opens. Every field the device test reads is
+ * still here; it just no longer ships on screen.
+ */
+function DebugOverlay({ vm, onHide }: { vm: SpeedViewModel; onHide: () => void }) {
   const d = vm.debug;
   const l = vm.location;
   const s = vm.m2.session;
@@ -90,10 +113,20 @@ function DebugOverlay({ vm }: { vm: SpeedViewModel }) {
       : l.permission;
   return (
     <div
-      className="mt-auto rounded-lg bg-neutral-900 p-3 font-mono text-xs text-neutral-400"
+      className="dd-rise dd-card mt-2 p-3 font-mono text-xs text-[var(--dd-text-2)]"
       data-testid="debug-overlay"
     >
-      <div className="mb-1 font-semibold text-neutral-300">DRIVE-TEST DEBUG (SPEC O4)</div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="dd-micro text-[var(--dd-text-2)]">Drive-test debug</span>
+        <button
+          type="button"
+          onClick={onHide}
+          className="dd-btn dd-btn-quiet px-3 text-xs"
+          data-testid="debug-hide"
+        >
+          Hide
+        </button>
+      </div>
       <div>raw: {d.rawSpeedMps === null ? 'n/a' : `${d.rawSpeedMps.toFixed(2)} m/s`}</div>
       <div>smoothed: {vm.state.displaySpeedMps.toFixed(2)} m/s ({vm.state.confidence})</div>
       <div>
@@ -133,7 +166,7 @@ function DebugOverlay({ vm }: { vm: SpeedViewModel }) {
           ? 'none'
           : `${l.lastErrorCode}${l.lastErrorMessage ? ` — ${l.lastErrorMessage}` : ''}`}
       </div>
-      {vm.error ? <div className="text-red-400">error: {vm.error}</div> : null}
+      {vm.error ? <div className="text-[var(--dd-accent)]">error: {vm.error}</div> : null}
     </div>
   );
 }
