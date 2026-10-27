@@ -13,9 +13,10 @@
 // still produces a course once it has travelled the floor, while jitter
 // inside the error circle never does.
 //
-// Pure logic. Fusion with the device bearing happens in HeadingFilter
-// (priority: bearing -> derived course -> null); the M2-O4 speed gate and
-// smoothing treat a derived course exactly like a bearing.
+// Pure logic. Fusion with the device bearing and the phone compass happens
+// in HeadingFilter (SPEC M2-O9: moving = course -> bearing -> orientation;
+// stationary = orientation only); the M2-O4 speed gate and smoothing treat
+// a derived course exactly like a bearing.
 
 import { haversineM, PosSample } from '../core/stationary';
 import { COURSE } from './constants';

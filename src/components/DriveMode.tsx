@@ -45,11 +45,14 @@ export function DriveMode({ vm }: Props) {
       </header>
 
       {/* Compass: a full-width tape under a fixed index (SPEC M2-O6).
-          `dimmed` keeps a STALE/LOST hold from reading as live data. */}
+          `dimmed` keeps a STALE/LOST hold from reading as live data, and
+          dims an orientation heading (M2-O9): the phone's attitude while
+          parked is honest data, but it is not direction of travel. */}
       <HeadingTape
         headingDeg={vm.m2.headingDeg}
         suppressed={vm.m2.headingSuppressed}
-        dimmed={vm.state.fixState !== 'LIVE'}
+        dimmed={vm.state.fixState !== 'LIVE' || vm.m2.headingSource === 'orientation'}
+        source={vm.m2.headingSource}
       />
 
       <div className="flex flex-col items-center gap-3 pt-1">
@@ -147,10 +150,11 @@ function DebugOverlay({ vm, onHide }: { vm: SpeedViewModel; onHide: () => void }
         line: {vm.m2.alertLimitKmh === null ? 'off' : `${vm.m2.alertLimitKmh} km/h`}
         {vm.m2.alertOver ? ' (over)' : ''}
       </div>
-      {/* Heading chain (SPEC M2-O8): the device test reads all five lines.
-          raw heading is the bearing straight off coords.heading; derived
-          course is the fix-to-fix fallback; suppression says why the tape
-          is held; gate speed is the exact m/s the filter gate sees. */}
+      {/* Heading chain (SPEC M2-O8 + M2-O9): the device test reads these
+          lines. raw heading is the bearing straight off coords.heading;
+          derived course is the fix-to-fix fallback; suppression says why the
+          tape is held; gate speed is the exact m/s the filter gate sees;
+          orientation is the phone compass (parked heading, M2-O9). */}
       <div>
         raw heading:{' '}
         {vm.m2.rawHeadingDeg === null ? 'null' : `${vm.m2.rawHeadingDeg.toFixed(0)} deg`}
@@ -169,6 +173,15 @@ function DebugOverlay({ vm, onHide }: { vm: SpeedViewModel; onHide: () => void }
       </div>
       <div>suppression: {vm.m2.headingSuppression ?? 'none'}</div>
       <div>gate speed: {vm.m2.gateSpeedMps.toFixed(2)} m/s</div>
+      {/* Phone compass (SPEC M2-O9): the parked-heading source, on the same
+          gate. `off` means no fresh reading — sensor missing, denied, or
+          quiet for ORIENTATION.STALE_AFTER_MS — never a placeholder. */}
+      <div>
+        orientation:{' '}
+        {vm.m2.orientationDeg === null
+          ? 'off'
+          : `${vm.m2.orientationDeg.toFixed(0)} deg`}
+      </div>
       {/* Location-chain health (SPEC M1-O7): the next device test self-diagnoses. */}
       <div>permission: {permission}</div>
       <div>

@@ -86,6 +86,50 @@ export const HEADING = {
    * long enough may have been turned (parking manoeuvre).
    */
   RESEED_AFTER_SUPPRESSED_MS: 30_000,
+  /**
+   * Smoothing time constant for the phone's own compass (SPEC M2-O9).
+   * Parked, the driver rotates the phone by hand and expects the tape to
+   * follow inside one glance: 300 ms lands in the same 200-300 ms follow
+   * family as the tape's own 250 ms transition (M2-O6). At speed the M2-O4
+   * 1.5 s constant stays — a GPS course at 25 m/s is noisy, and the ring
+   * must read smooth, not twitchy.
+   */
+  TAU_ORIENTATION_MS: 300,
+  /**
+   * Stuck-bearing guard (SPEC M2-O9, hypothesis H2): a provider can send a
+   * constant bearing forever — it is finite, so M2-O8 fused it and the tape
+   * sat at North while the car drove. Zero variance means every bearing in
+   * the window stays within this epsilon of the window's first value; 0.5°
+   * absorbs the last-digit jitter of a real bearing without hiding a real
+   * turn.
+   */
+  STUCK_BEARING_EPS_DEG: 0.5,
+  /** The bearing must hold still this long before it counts as stuck. */
+  STUCK_BEARING_WINDOW_MS: 30_000,
+  /**
+   * ... and the derived course must have turned this far inside that window
+   * to prove the car really moved while the bearing did not. A stuck 0° on a
+   * straight road north is harmless; a stuck 0° while the course swings 20°
+   * is the North-peg bug.
+   */
+  STUCK_COURSE_DELTA_DEG: 20,
+} as const;
+
+/**
+ * Phone-orientation source (SPEC M2-O9): readings older than this are
+ * dropped, so a sensor that dies mid-session falls back to the dimmed idle
+ * instead of holding a stale heading. Generous against a WebView that
+ * delivers at tens of hertz while the screen is on.
+ */
+export const ORIENTATION = {
+  STALE_AFTER_MS: 5_000,
+  /**
+   * Grace period for the first reading after start. The API can exist and
+   * still deliver nothing (wrong WebView build, sensor missing) — the
+   * overlay's `orientation: off` plus this timeout is what tells us the
+   * web route is insufficient and the native sensors plugin is needed.
+   */
+  FIRST_READ_TIMEOUT_MS: 3_000,
 } as const;
 
 /** Derived-course fallback (SPEC M2-O8). */

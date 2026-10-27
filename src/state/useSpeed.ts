@@ -17,10 +17,12 @@ import { Unit } from '../core/units';
 import { Buzz } from '../platform/Buzz';
 import { ScreenLock } from '../platform/ScreenLock';
 import { SourceDiagnostics, SpeedSource } from '../platform/SpeedSource';
+import { OrientationSource } from '../platform/orientation';
 import { CourseDeriver } from '../session/course';
-import { HeadingFilter, HeadingSuppression } from '../session/heading';
+import { HeadingFilter, HeadingSource, HeadingSuppression } from '../session/heading';
 import { SessionMachine, SessionSnapshot } from '../session/sessionMachine';
 import { ThresholdMonitor, stepThreshold } from '../session/threshold';
+import { ORIENTATION } from '../session/constants';
 import { ChipView, chipFor } from './locationChip';
 
 export type DriveMode = 'drive' | 'hud';
@@ -51,6 +53,14 @@ export interface M2State {
   derivedCourseDeg: number | null;
   headingSuppression: HeadingSuppression;
   gateSpeedMps: number;
+  /**
+   * Phone-compass reading (SPEC M2-O9): the last fresh orientation value,
+   * or null when the source is off / denied / stale — the overlay's
+   * `orientation: <deg> deg | off` line. Never a placeholder heading.
+   */
+  orientationDeg: number | null;
+  /** Which source the tape follows (M2-O9): 'course' | 'bearing' | 'orientation' | null. */
+  headingSource: HeadingSource;
   /** Bumped once per alert tick; drives the screen-edge flash. */
   flashKey: number;
 }
@@ -95,6 +105,7 @@ export function useSpeed(
   source: SpeedSource,
   screenLock: ScreenLock,
   buzz: Buzz,
+  orientation: OrientationSource,
   opts?: { unit?: Unit; mode?: DriveMode },
 ): SpeedViewModel {
   const processorRef = useRef(new SpeedProcessor());
@@ -111,6 +122,10 @@ export function useSpeed(
   const headingRef = useRef(new HeadingFilter());
   const courseRef = useRef(new CourseDeriver());
   const rawHeadingRef = useRef<number | null>(null); // last device bearing (M2-O8)
+  // Last phone-compass reading (M2-O9): value + stamp on the feedFrame clock,
+  // so staleness is judged against the same performance.now() timeline.
+  const orientationDegRef = useRef<number | null>(null);
+  const orientationMsRef = useRef<number | null>(null);
   const flashRef = useRef(0);
   const latestSpeedRef = useRef(0);
 
@@ -138,8 +153,21 @@ export function useSpeed(
     derivedCourseDeg: null,
     headingSuppression: null,
     gateSpeedMps: 0,
+    orientationDeg: null,
+    headingSource: null,
     flashKey: 0,
   }));
+
+  /**
+   * The compass reading that counts right now (SPEC M2-O9): null before the
+   * first reading and once the source goes quiet, so a sensor that dies
+   * mid-session falls back to the dimmed idle instead of holding a heading.
+   */
+  const freshOrientation = useCallback((tMs: number): number | null => {
+    const at = orientationMsRef.current;
+    if (at === null || tMs - at > ORIENTATION.STALE_AFTER_MS) return null;
+    return orientationDegRef.current;
+  }, []);
 
   /** Mirror the pure M2 machines into React state. */
   const syncM2 = useCallback((tMs: number): M2State => {
@@ -156,15 +184,41 @@ export function useSpeed(
       // feedFrame pushes into the heading gate, so the overlay reads the
       // real gate input (SPEC M2-O8).
       gateSpeedMps: latestSpeedRef.current,
+      orientationDeg: freshOrientation(tMs),
+      headingSource: headingRef.current.lastSource(),
       flashKey: flashRef.current,
     };
     setM2(next);
     return next;
-  }, []);
+  }, [freshOrientation]);
 
   // Chain health (permission / provider / watch / last error) is pushed by the
   // source; the chip and the overlay read it (SPEC M1-O7).
   useEffect(() => source.onDiagnostics(setLocation), [source]);
+
+  // Phone compass (SPEC M2-O9): the heading source while parked. Readings
+  // land in refs only — RAM, like everything else (M1-O5) — and feedFrame
+  // drops them after ORIENTATION.STALE_AFTER_MS so a dead sensor dims the
+  // tape instead of holding a stale heading.
+  useEffect(() => {
+    let mounted = true;
+    const off = orientation.onReading((r) => {
+      if (!mounted) return;
+      orientationDegRef.current = r.headingDeg;
+      orientationMsRef.current = r.tMs;
+    });
+    orientation.start().catch(() => {
+      // Permission/API failures are not fatal: status stays honest, the tape
+      // keeps its dimmed idle (never a fake heading).
+    });
+    return () => {
+      mounted = false;
+      off();
+      orientation.stop();
+      orientationDegRef.current = null;
+      orientationMsRef.current = null;
+    };
+  }, [orientation]);
 
   const allowLocation = useCallback(() => {
     void source.requestPermission();
@@ -230,14 +284,17 @@ export function useSpeed(
       headingRef.current.push({
         headingDeg: snap.headingDeg,
         // M2-O8: the derived course stands in when the device bearing is
-        // absent; fusion priority lives in fuseHeadingDeg.
+        // absent; M2-O9 adds the phone compass (below the gate it is the
+        // only source, at speed it is third in line). Fusion priority lives
+        // in fuseHeadingDeg / HeadingFilter.push.
         courseDeg: courseRef.current.value(),
+        orientationDeg: freshOrientation(tMs),
         speedMps: snap.displaySpeedMps,
         tMs,
       });
       syncM2(tMs);
     },
-    [buzz, syncM2],
+    [buzz, syncM2, freshOrientation],
   );
 
   // Start the source + a staleness tick. The tick runs while mounted so

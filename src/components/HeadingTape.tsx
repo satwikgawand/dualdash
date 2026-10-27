@@ -6,11 +6,13 @@
 //
 // The strip is drawn three times (-360°, 0°, +360°), so the visible window
 // never reaches the 0°/360° seam: the wrap is seamless by construction and
-// there is no modulo reset to flicker (tapeMath.ts). Below the speed gate the
-// tape holds its last heading, dims, and reads "— heading —" instead of
-// showing noise (M2-O4 suppression unchanged). HUD mode keeps the small
-// arrow: the windshield stays about speed.
+// there is no modulo reset to flicker (tapeMath.ts). Below the speed gate
+// the tape follows the phone's own compass when there is one (SPEC M2-O9,
+// dimmed — attitude, not direction of travel) and otherwise holds its last
+// heading, dims, and reads "— heading —" instead of showing noise. HUD mode
+// keeps the small arrow: the windshield stays about speed.
 
+import { HeadingSource } from '../session/heading';
 import {
   TAPE_EASING,
   TAPE_FOLLOW_MS,
@@ -31,12 +33,23 @@ interface Props {
    * as a live measurement — the same honesty rule as the speed readout.
    */
   dimmed?: boolean;
+  /**
+   * Which source the heading came from (SPEC M2-O9). Rendered as a
+   * data-attribute only — the drive test reads it to prove the parked
+   * compass path and the driving course path without opening the overlay.
+   */
+  source?: HeadingSource;
 }
 
 /** Tape content is static (3 copies of the rose); build it once. */
 const TAPE_CONTENT = tapeItems();
 
-export function HeadingTape({ headingDeg, suppressed, dimmed = false }: Props) {
+export function HeadingTape({
+  headingDeg,
+  suppressed,
+  dimmed = false,
+  source = null,
+}: Props) {
   const hasCourse = headingDeg !== null && Number.isFinite(headingDeg);
   const heading = hasCourse ? (headingDeg ?? 0) : 0;
   const readout = tapeReadout(headingDeg);
@@ -50,6 +63,7 @@ export function HeadingTape({ headingDeg, suppressed, dimmed = false }: Props) {
       data-testid="heading-tape"
       data-suppressed={String(suppressed)}
       data-dimmed={String(dimmed)}
+      data-source={source ?? 'none'}
     >
       <div
         className="dd-tape-fade relative h-16 overflow-hidden"

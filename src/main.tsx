@@ -15,6 +15,10 @@ import {
   WebScreenLock,
 } from './platform/ScreenLock';
 import { SpeedSource } from './platform/SpeedSource';
+import {
+  OrientationSource,
+  WebOrientationSource,
+} from './platform/orientation';
 import './index.css';
 
 // A gentle synthetic drive for browser dev: accelerates, cruises through a
@@ -60,6 +64,13 @@ function pickScreenLock(): ScreenLock {
     : new WebScreenLock();
 }
 
+// Phone compass for the parked heading (SPEC M2-O9): the Web
+// deviceorientation route in every build — Android WebView and browser alike
+// — so the device test measures the same code path the decision rests on.
+function pickOrientation(): OrientationSource {
+  return new WebOrientationSource();
+}
+
 // Haptics (SPEC M2-O3): one implementation for both targets — the official
 // @capacitor/haptics plugin falls back to navigator.vibrate on the web.
 function pickBuzz(): Buzz {
@@ -73,6 +84,7 @@ root.render(
       source={pickSource()}
       screenLock={pickScreenLock()}
       buzz={pickBuzz()}
+      orientation={pickOrientation()}
     />
   </StrictMode>,
 );
