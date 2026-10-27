@@ -212,6 +212,10 @@ export class CapacitorSpeedSource implements SpeedSource {
       lat: c.latitude,
       lon: c.longitude,
       elapsedRealtimeNanos: monoNs,
+      // NaN when the device carries no bearing — on Android that is the
+      // normal state at rest and common while moving (hasBearing() false),
+      // which is why the pipeline accepts NaN as "unknown" and the derived
+      // course fallback exists (SPEC M2-O8).
       headingDeg: finite(c.heading),
     };
     for (const cb of this.listeners) cb(fix);

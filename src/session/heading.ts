@@ -11,16 +11,47 @@
 // instead of noise. Suppressed stretches longer than RESEED_AFTER_SUPPRESSED_MS
 // re-seed from the new sample, because a car parked long enough may have been
 // turned while standing still.
+//
+// M2-O8: Android frequently delivers no bearing at all (hasBearing() false).
+// Each sample may therefore also carry a course derived from position deltas
+// (src/session/course.ts). Fusion priority is fixed: device bearing ->
+// derived course -> null (suppressed). Everything else — the speed gate,
+// the smoothing, the re-seed — is unchanged and treats a derived course
+// exactly like a bearing. lastSuppressionReason() tells the drive-test
+// overlay WHY a sample was suppressed: no source at all, or low speed.
 
 import { HEADING } from './constants';
 
 export interface HeadingSample {
-  /** True-course in degrees, or null when the fix carries none. */
+  /** Device bearing in degrees, or null when the fix carries none. */
   headingDeg: number | null;
+  /**
+   * Course derived from consecutive fixes (SPEC M2-O8), or null before
+   * COURSE.MIN_DERIVE_DISPLACEMENT_M of travel. Optional: samples without
+   * it fuse exactly as before (bearing only).
+   */
+  courseDeg?: number | null;
   /** Smoothed speed in m/s (the suppression gate). */
   speedMps: number;
   /** Monotonic milliseconds. */
   tMs: number;
+}
+
+/** Why the last sample was suppressed (null while the output is live). */
+export type HeadingSuppression = 'low-speed' | 'no-source' | null;
+
+/**
+ * Fusion priority (SPEC M2-O8): a finite device bearing always wins; a
+ * finite derived course stands in when the bearing is missing or invalid;
+ * otherwise null (the filter suppresses).
+ */
+export function fuseHeadingDeg(
+  bearingDeg: number | null | undefined,
+  courseDeg: number | null | undefined,
+): number | null {
+  if (typeof bearingDeg === 'number' && Number.isFinite(bearingDeg)) return bearingDeg;
+  if (typeof courseDeg === 'number' && Number.isFinite(courseDeg)) return courseDeg;
+  return null;
 }
 
 export class HeadingFilter {
@@ -31,18 +62,21 @@ export class HeadingFilter {
   private lastValidMs: number | null = null;
   private suppressedSinceMs: number | null = null;
   private suppressed = true;
+  private reason: HeadingSuppression = null;
 
   /**
    * Feed one sample. Returns the smoothed heading in degrees [0, 360), or
-   * null while suppressed (below speed gate / no heading).
+   * null while suppressed (below speed gate / no heading or course).
    */
   push(sample: HeadingSample): number | null {
-    const heading = sample.headingDeg;
-    const usable =
-      heading !== null &&
-      Number.isFinite(heading) &&
-      Number.isFinite(sample.speedMps) &&
-      sample.speedMps >= HEADING.MIN_SPEED_MPS;
+    const heading = fuseHeadingDeg(sample.headingDeg, sample.courseDeg);
+    const speedOk =
+      Number.isFinite(sample.speedMps) && sample.speedMps >= HEADING.MIN_SPEED_MPS;
+    const usable = heading !== null && speedOk;
+
+    // Instrumentation for the drive-test overlay (SPEC M2-O8): no source at
+    // all is a different device problem from the expected low-speed hold.
+    this.reason = heading === null ? 'no-source' : !speedOk ? 'low-speed' : null;
 
     if (!usable || heading === null) {
       if (this.suppressedSinceMs === null) this.suppressedSinceMs = sample.tMs;
@@ -87,6 +121,15 @@ export class HeadingFilter {
     return this.suppressed;
   }
 
+  /**
+   * Why the last sample was suppressed: 'no-source' (no bearing and no
+   * derived course) or 'low-speed' (a source existed but the gate held it).
+   * Null when the last sample was accepted, or before the first push.
+   */
+  lastSuppressionReason(): HeadingSuppression {
+    return this.reason;
+  }
+
   reset(): void {
     this.sx = 0;
     this.sy = 0;
@@ -95,6 +138,7 @@ export class HeadingFilter {
     this.lastValidMs = null;
     this.suppressedSinceMs = null;
     this.suppressed = true;
+    this.reason = null;
   }
 }
 

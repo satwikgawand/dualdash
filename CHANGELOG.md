@@ -4,6 +4,12 @@ All notable changes to DualDash are documented here. Format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed — heading tape dead on device (SPEC M2-O8, 2026-10-27)
+
+- **Derived-course fallback for the heading tape.** On the owner's Android device the tape never moved: the plugin delivers `coords.heading: null` whenever `Location.hasBearing()` is false (normal at rest, common while moving), `finite(null)` became NaN, the pipeline passed `headingDeg: null` and `HeadingFilter` suppressed forever. The browser check could not catch it: the dev trace always carries a heading. Course is now derived from consecutive fixes (initial bearing across a ≥ 5 m baseline; `haversineM` imported from core, core untouched) and fused with fixed priority: **device bearing → derived course → null**. The sub-floor anchor accumulates displacement, so slow creep still earns a course while jitter never does. M2-O4 semantics unchanged (3 m/s gate, TAU 1.5 s, 30 s re-seed, dimmed idle); tape visuals (M2-O6) untouched; the HUD arrow shares the fallback.
+- **The drive-test overlay now instruments the whole heading chain** (existing 5-tap gate): `raw heading` (value | null), `derived course`, filtered `heading`, `suppression: none | low-speed | no-source`, and the exact `gate speed` in m/s feeding the filter. The gate input was verified as m/s (`DisplayState.displaySpeedMps`, core contract) — the wrong-unit suspicion is refuted by test.
+- **Tests.** 241 → **273 / 273** (16 files): derived-course azimuth (cardinals, metric diagonals), 5 m displacement floor, anchor accumulation, non-finite positions; fusion priority table (bearing wins / course stands in / both null suppresses), derived course through the filter end-to-end, m/s gate boundaries, suppression reasons.
+
 ### Added — M2 polish: direction-aware roll, heading tape, production visual pass (2026-10-26)
 
 The readout, the compass and the whole Drive/HUD surface in one visual language. Realtime-only scope (M1-O5) unchanged: nothing is stored, nothing added to `src/core`, zero new dependencies.

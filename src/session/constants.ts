@@ -87,3 +87,16 @@ export const HEADING = {
    */
   RESEED_AFTER_SUPPRESSED_MS: 30_000,
 } as const;
+
+/** Derived-course fallback (SPEC M2-O8). */
+export const COURSE = {
+  /**
+   * Minimum displacement between the two fixes used for the derived course.
+   * Below this the azimuth is noise: at the typical 3-8 m horizontal error a
+   * short baseline swings wildly. 5 m matches the pipeline's own restart
+   * displacement (PIPELINE.RESTART_DISPLACEMENT_M) — the smallest travel the
+   * speed pipeline trusts — so the course gate and the speed gate agree on
+   * what counts as real movement.
+   */
+  MIN_DERIVE_DISPLACEMENT_M: 5,
+} as const;

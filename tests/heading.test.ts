@@ -4,7 +4,7 @@
 // Degrees are never averaged naively — the seam rows prove it.
 
 import { describe, expect, it } from 'vitest';
-import { HeadingFilter, headingDeltaDeg } from '../src/session/heading';
+import { HeadingFilter, fuseHeadingDeg, headingDeltaDeg } from '../src/session/heading';
 import { HEADING } from '../src/session/constants';
 
 const SPEED = 15; // m/s, well above the 3 m/s gate
@@ -200,5 +200,155 @@ describe('heading: headingDeltaDeg helper', () => {
 
   it.each(cases)('delta($a, $b) = $want', ({ a, b, want }) => {
     expect(headingDeltaDeg(a, b)).toBe(want);
+  });
+});
+
+describe('heading: fusion priority — bearing -> derived course -> null (M2-O8)', () => {
+  it('fuseHeadingDeg priority table', () => {
+    // [bearing, course, fused]
+    expect(fuseHeadingDeg(90, 270)).toBe(90); // bearing always wins
+    expect(fuseHeadingDeg(90, null)).toBe(90);
+    expect(fuseHeadingDeg(90, NaN)).toBe(90);
+    expect(fuseHeadingDeg(null, 270)).toBe(270); // course stands in
+    expect(fuseHeadingDeg(NaN, 270)).toBe(270);
+    expect(fuseHeadingDeg(undefined, 270)).toBe(270);
+    expect(fuseHeadingDeg(null, null)).toBeNull(); // nothing to show
+    expect(fuseHeadingDeg(NaN, NaN)).toBeNull();
+    expect(fuseHeadingDeg(null, NaN)).toBeNull();
+    expect(fuseHeadingDeg(undefined, undefined)).toBeNull();
+  });
+
+  const cases: Array<{
+    name: string;
+    headingDeg: number | null;
+    courseDeg: number | null;
+    near: number | null;
+  }> = [
+    {
+      name: 'at speed, the device bearing wins over the derived course',
+      headingDeg: 90,
+      courseDeg: 270,
+      near: 90,
+    },
+    {
+      name: 'at speed, a null bearing falls back to the derived course',
+      headingDeg: null,
+      courseDeg: 270,
+      near: 270,
+    },
+    {
+      name: 'at speed, a NaN bearing falls back to the derived course',
+      headingDeg: NaN,
+      courseDeg: 270,
+      near: 270,
+    },
+    {
+      name: 'bearing null and no course stays suppressed (the pre-M2-O8 bug)',
+      headingDeg: null,
+      courseDeg: null,
+      near: null,
+    },
+    {
+      name: 'bearing NaN and course NaN stays suppressed',
+      headingDeg: NaN,
+      courseDeg: NaN,
+      near: null,
+    },
+  ];
+
+  it.each(cases)(
+    '$name',
+    ({ headingDeg, courseDeg, near }) => {
+      const f = new HeadingFilter();
+      const out = f.push({ headingDeg, courseDeg, speedMps: SPEED, tMs: 0 });
+      if (near === null) {
+        expect(out).toBeNull();
+        expect(f.isSuppressed()).toBe(true);
+      } else {
+        expect(out).not.toBeNull();
+        expect(headingDeltaDeg(out!, near)).toBeLessThan(0.01);
+      }
+    },
+  );
+
+  it('the speed gate applies to a derived course as to a bearing', () => {
+    const f = new HeadingFilter();
+    expect(f.push({ headingDeg: null, courseDeg: 270, speedMps: 2.99, tMs: 0 })).toBeNull();
+    expect(f.push({ headingDeg: null, courseDeg: 270, speedMps: 3, tMs: 1000 })).not.toBeNull();
+  });
+
+  it('a derived course drives the filter end-to-end (the device-null fix)', () => {
+    const f = new HeadingFilter();
+    // The device bearing never arrives; fixes keep flowing at driving speed.
+    let out: number | null = null;
+    for (let t = 0; t <= 4000; t += 1000) {
+      out = f.push({ headingDeg: null, courseDeg: 90, speedMps: SPEED, tMs: t });
+    }
+    expect(out).not.toBeNull();
+    expect(headingDeltaDeg(out!, 90)).toBeLessThan(0.01);
+    expect(f.isSuppressed()).toBe(false);
+    expect(f.lastSuppressionReason()).toBeNull();
+  });
+});
+
+describe('heading: gate input is metres per second (M2-O8)', () => {
+  // The feed is DisplayState.displaySpeedMps (core/types.ts: "Speed in metres
+  // per second"); this pins the gate's m/s semantics on that contract.
+  const cases: Array<{ name: string; speedMps: number; expectSuppressed: boolean }> = [
+    { name: 'a 50 km/h drive (14 m/s) passes the gate', speedMps: 14, expectSuppressed: false },
+    { name: 'a walking pace (1.4 m/s) is suppressed', speedMps: 1.4, expectSuppressed: true },
+    { name: 'parked (0 m/s) is suppressed', speedMps: 0, expectSuppressed: true },
+    { name: '3 m/s exactly passes (inclusive threshold)', speedMps: 3, expectSuppressed: false },
+    { name: '2.999 m/s is suppressed', speedMps: 2.999, expectSuppressed: true },
+  ];
+
+  it.each(cases)('$name', ({ speedMps, expectSuppressed }) => {
+    const f = new HeadingFilter();
+    const out = f.push({ headingDeg: 90, courseDeg: null, speedMps, tMs: 0 });
+    expect(out === null).toBe(expectSuppressed);
+  });
+});
+
+describe('heading: suppression reason for the drive-test overlay (M2-O8)', () => {
+  it('a fresh filter reports no reason until the first push', () => {
+    expect(new HeadingFilter().lastSuppressionReason()).toBeNull();
+  });
+
+  it('a heading above the gate reports no reason', () => {
+    const f = new HeadingFilter();
+    f.push({ headingDeg: 90, speedMps: SPEED, tMs: 0 });
+    expect(f.lastSuppressionReason()).toBeNull();
+  });
+
+  it('a heading below the gate reports low-speed', () => {
+    const f = new HeadingFilter();
+    f.push({ headingDeg: 90, speedMps: 1, tMs: 0 });
+    expect(f.lastSuppressionReason()).toBe('low-speed');
+  });
+
+  it('a missing source at driving speed reports no-source', () => {
+    const f = new HeadingFilter();
+    f.push({ headingDeg: null, courseDeg: null, speedMps: SPEED, tMs: 0 });
+    expect(f.lastSuppressionReason()).toBe('no-source');
+  });
+
+  it('a missing source below the gate reports no-source (the source is the deeper gap)', () => {
+    const f = new HeadingFilter();
+    f.push({ headingDeg: null, speedMps: 1, tMs: 0 });
+    expect(f.lastSuppressionReason()).toBe('no-source');
+  });
+
+  it('the reason clears when a sample is accepted again', () => {
+    const f = new HeadingFilter();
+    f.push({ headingDeg: null, speedMps: SPEED, tMs: 0 }); // no-source
+    f.push({ headingDeg: 90, speedMps: SPEED, tMs: 1000 }); // accepted
+    expect(f.lastSuppressionReason()).toBeNull();
+  });
+
+  it('reset() clears the reason', () => {
+    const f = new HeadingFilter();
+    f.push({ headingDeg: null, speedMps: SPEED, tMs: 0 });
+    f.reset();
+    expect(f.lastSuppressionReason()).toBeNull();
   });
 });

@@ -147,12 +147,28 @@ function DebugOverlay({ vm, onHide }: { vm: SpeedViewModel; onHide: () => void }
         line: {vm.m2.alertLimitKmh === null ? 'off' : `${vm.m2.alertLimitKmh} km/h`}
         {vm.m2.alertOver ? ' (over)' : ''}
       </div>
+      {/* Heading chain (SPEC M2-O8): the device test reads all five lines.
+          raw heading is the bearing straight off coords.heading; derived
+          course is the fix-to-fix fallback; suppression says why the tape
+          is held; gate speed is the exact m/s the filter gate sees. */}
+      <div>
+        raw heading:{' '}
+        {vm.m2.rawHeadingDeg === null ? 'null' : `${vm.m2.rawHeadingDeg.toFixed(0)} deg`}
+      </div>
+      <div>
+        derived course:{' '}
+        {vm.m2.derivedCourseDeg === null
+          ? 'none'
+          : `${vm.m2.derivedCourseDeg.toFixed(0)} deg`}
+      </div>
       <div>
         heading:{' '}
         {vm.m2.headingSuppressed || vm.m2.headingDeg === null
           ? '--'
           : `${vm.m2.headingDeg.toFixed(0)} deg`}
       </div>
+      <div>suppression: {vm.m2.headingSuppression ?? 'none'}</div>
+      <div>gate speed: {vm.m2.gateSpeedMps.toFixed(2)} m/s</div>
       {/* Location-chain health (SPEC M1-O7): the next device test self-diagnoses. */}
       <div>permission: {permission}</div>
       <div>

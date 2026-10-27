@@ -17,7 +17,8 @@ import { Unit } from '../core/units';
 import { Buzz } from '../platform/Buzz';
 import { ScreenLock } from '../platform/ScreenLock';
 import { SourceDiagnostics, SpeedSource } from '../platform/SpeedSource';
-import { HeadingFilter } from '../session/heading';
+import { CourseDeriver } from '../session/course';
+import { HeadingFilter, HeadingSuppression } from '../session/heading';
 import { SessionMachine, SessionSnapshot } from '../session/sessionMachine';
 import { ThresholdMonitor, stepThreshold } from '../session/threshold';
 import { ChipView, chipFor } from './locationChip';
@@ -40,6 +41,16 @@ export interface M2State {
   /** Smoothed heading in degrees (held while suppressed). */
   headingDeg: number | null;
   headingSuppressed: boolean;
+  /**
+   * Heading-chain instrumentation (SPEC M2-O8, drive-test overlay):
+   * raw device bearing (null when the fix carried none), the course derived
+   * from position deltas (null before 5 m of travel), why the heading is
+   * suppressed, and the exact m/s value that feeds the heading gate.
+   */
+  rawHeadingDeg: number | null;
+  derivedCourseDeg: number | null;
+  headingSuppression: HeadingSuppression;
+  gateSpeedMps: number;
   /** Bumped once per alert tick; drives the screen-edge flash. */
   flashKey: number;
 }
@@ -98,6 +109,8 @@ export function useSpeed(
   const sessionRef = useRef(new SessionMachine());
   const thresholdRef = useRef(new ThresholdMonitor());
   const headingRef = useRef(new HeadingFilter());
+  const courseRef = useRef(new CourseDeriver());
+  const rawHeadingRef = useRef<number | null>(null); // last device bearing (M2-O8)
   const flashRef = useRef(0);
   const latestSpeedRef = useRef(0);
 
@@ -121,6 +134,10 @@ export function useSpeed(
     alertOver: thresholdRef.current.isOver(),
     headingDeg: headingRef.current.value(),
     headingSuppressed: headingRef.current.isSuppressed(),
+    rawHeadingDeg: null,
+    derivedCourseDeg: null,
+    headingSuppression: null,
+    gateSpeedMps: 0,
     flashKey: 0,
   }));
 
@@ -132,6 +149,13 @@ export function useSpeed(
       alertOver: thresholdRef.current.isOver(),
       headingDeg: headingRef.current.value(),
       headingSuppressed: headingRef.current.isSuppressed(),
+      rawHeadingDeg: rawHeadingRef.current,
+      derivedCourseDeg: courseRef.current.value(),
+      headingSuppression: headingRef.current.lastSuppressionReason(),
+      // latestSpeedRef is set to exactly the displaySpeedMps that the next
+      // feedFrame pushes into the heading gate, so the overlay reads the
+      // real gate input (SPEC M2-O8).
+      gateSpeedMps: latestSpeedRef.current,
       flashKey: flashRef.current,
     };
     setM2(next);
@@ -157,6 +181,8 @@ export function useSpeed(
       proc.pushFix(fix);
 
       rawSpeedRef.current = fix.hasSpeed ? fix.speedMps : null;
+      rawHeadingRef.current = Number.isFinite(fix.headingDeg) ? fix.headingDeg : null;
+      courseRef.current.push({ lat: fix.lat, lon: fix.lon });
       fixCountRef.current += 1;
       if (lastFixNsRef.current !== null) {
         lastIntervalRef.current = Number(fix.elapsedRealtimeNanos - lastFixNsRef.current) / 1e9 * 1000;
@@ -203,6 +229,9 @@ export function useSpeed(
       }
       headingRef.current.push({
         headingDeg: snap.headingDeg,
+        // M2-O8: the derived course stands in when the device bearing is
+        // absent; fusion priority lives in fuseHeadingDeg.
+        courseDeg: courseRef.current.value(),
         speedMps: snap.displaySpeedMps,
         tMs,
       });
