@@ -19,7 +19,7 @@ Owner request on the closing card: \"we need to add support for landscape view\"
 - **Compound worst case (SIGNAL LOST banner + held pill + in-session):** 800×480 and 851×393 still fit; 740×360 scrolls **21 px** (banner 42 px) — the same honest fallback portrait already uses (375×667 scrolls **75 px** there), never an overlap.
 - **Unchanged:** reduced motion (tape-track transition `none`, live-dot `none`), the SystemBars config, the HUD mirror (`matrix(-1, 0, 0, 1, 0, 0)` with `rotate(0deg)` at heading 0), no new dependency, `src/core` diff empty.
 - **Tests.** 327 → **345 / 345**: new `tests/orientationLayout.test.ts` guards the manifest value and `configChanges`, all four inset axes with the 1 rem base, the exact portrait clamp, the landscape height clamp, the grid areas, the tape/chips placement, the HUD hook, the absence of motion in the landscape block, the mirror, the threshold DOM order and the reduced-motion rule. `npm run build` and `npm run cap:sync` green.
-- **Owner check for the next APK (device).** Rotate both ways in Drive and HUD: the bars stay hidden, the swipe reveal works, the tape and the readout clear the cutout on the side, and a running session plus the GPS fix keep going without a restart.
+- **Owner check for v1.3 (device).** Rotate both ways in Drive and HUD: the bars stay hidden, the swipe reveal works, the tape and the readout clear the cutout on the side, and a running session plus the GPS fix keep going without a restart.
 
 ### Fixed — heading data was mirrored: true azimuth normalized at the source, natural W-N-E rose restored (SPEC M2-O11, 2026-10-27)
 
