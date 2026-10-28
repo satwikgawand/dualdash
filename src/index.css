@@ -259,6 +259,44 @@ body {
   font-size: clamp(4.75rem, 33vw, 13rem);
 }
 
+/* HUD windshield supersize (SPEC M2-O13). In HUD mode the phone lies flat
+   on the dash and the driver reads the WINDSHIELD REFLECTION, so the two
+   readouts take the whole viewport: the speed keeps the hero role at the
+   largest legible digits, and the heading becomes a matching giant compass
+   letter + degrees instead of the old 18 px arrow. Width-first sizing: the
+   3-slot odometer field measures ~0.673 em per tabular digit (measured in
+   the harness font), so 44vw keeps three digits inside the viewport with a
+   ~19 px side gutter on top of the 16 px shell padding; each clamp also
+   caps by height (dvh)
+   so a short viewport (square window, landscape) fits without scrolling.
+   Scope is HUD-only via `.dd-hud` — the Drive-mode `.dd-readout` cascade
+   above is byte-for-byte untouched. Unlayered, like the clamp above, so
+   the size wins over the `font-semibold` utility on the shared readout. */
+.dd-hud .dd-readout {
+  font-size: clamp(4.75rem, min(44vw, 27dvh), 20rem);
+  font-weight: 700;
+}
+.dd-hud-heading-letter {
+  font-size: clamp(3.5rem, min(41vw, 24dvh), 15rem);
+}
+.dd-hud-heading-deg {
+  font-size: clamp(1.25rem, min(7vw, 5dvh), 2.75rem);
+}
+
+/* HUD chrome, near-zero (SPEC M2-O13). The brand caption is the first thing
+   HUD mode gives up — the windshield is about the two heroes — and the mode
+   switch sheds its side padding (height keeps the 44 px touch minimum, and
+   width stays >= 44 px) so brand-free header fits ONE row even at 320 px.
+   Without this the mode switch is the control a mirror-mounted phone could
+   not reach: at 360 px the header row overflowed to 449 px and clipped it. */
+.dd-hud > header .dd-micro {
+  display: none;
+}
+.dd-hud > header [data-testid='mode-toggle'] button {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
 /* Landscape layout (SPEC M2-O12). The shell owns orientation the way it
    owns system-UI insets (M1-O6): the portrait markup is untouched, and this
    block only rearranges what already renders. Nothing here changes under
@@ -340,9 +378,11 @@ body {
     grid-column: 1 / -1;
   }
 
-  /* HUD mode: header to one row, the north arrow tucks closer to the
-     readout. The mirror flip, the palette and the arrow semantics are
-     untouched — only spacing changes. */
+  /* HUD mode (SPEC M2-O13 supersedes the M2-O12 spacing note): the header
+     is one row in BOTH orientations now, and the two heroes sit SIDE BY
+     SIDE — the landscape budget is short and wide, so a row fills it far
+     better than a stack. Mirror flip, palette and arrow semantics are
+     untouched; only layout and size change. */
   .dd-hud > header {
     flex-direction: row;
     align-items: center;
@@ -351,7 +391,24 @@ body {
   .dd-hud > header > div:first-child {
     flex: 1 1 auto;
   }
+  .dd-hud [data-testid='hud-mirror'] {
+    flex-direction: row;
+    align-items: center;
+    gap: 1.5rem;
+  }
   .dd-hud [data-testid='hud-heading'] {
-    margin-top: 0.5rem;
+    margin-top: 0;
+  }
+  /* Height-dominant clamps: width is generous here, height is the scarce
+     axis (360-480 px), so the speed caps at 56dvh and the letter at 40dvh —
+     still under the hero so the speed keeps the largest font on screen. */
+  .dd-hud .dd-readout {
+    font-size: clamp(4.5rem, min(34vw, 56dvh), 18rem);
+  }
+  .dd-hud-heading-letter {
+    font-size: clamp(3rem, min(26vw, 40dvh), 13rem);
+  }
+  .dd-hud-heading-deg {
+    font-size: clamp(1.1rem, min(5vw, 9dvh), 2.5rem);
   }
 }
