@@ -276,11 +276,28 @@ body {
   font-size: clamp(4.75rem, min(44vw, 27dvh), 20rem);
   font-weight: 700;
 }
+/* Direction-pair balance (SPEC M2-O14, owner ask after the windshield
+   build: "make the direction a bit smaller and the heading degree a bit
+   bigger"). The letter steps 41vw/24dvh -> 34vw/20dvh (-17 % font at
+   412x892: 168.92 -> 140.08 px) and the degrees step 7vw/5dvh ->
+   11vw/8dvh (+57 %: 28.84 -> 45.32 px), so the pair reads as one calm
+   unit instead of two near-equal giants. The speed clamp above is
+   untouched and stays the largest font on screen in BOTH terms
+   (44vw/27dvh > 34vw/20dvh > 11vw/8dvh) — the M2-O13 law, now asserted
+   for the degrees too in tests/hudLayout.test.ts. Muted colour (same ask):
+   both direction elements take the app's muted token —
+   --dd-text-3 (#8b8b96), the M2-O7 micro-label/tick grey, >= 4.5:1 on the
+   page surface and ~5.5:1 on HUD's pure black — so the pair sits back
+   under the full-strength speed. Unlayered like the clamps, so the colour
+   never depends on a wrapper utility; M2-O4 suppression keeps its extra
+   dim as opacity on the wrapper (HudMode), not a second colour. */
 .dd-hud-heading-letter {
-  font-size: clamp(3.5rem, min(41vw, 24dvh), 15rem);
+  font-size: clamp(3rem, min(34vw, 20dvh), 13rem);
+  color: var(--dd-text-3);
 }
 .dd-hud-heading-deg {
-  font-size: clamp(1.25rem, min(7vw, 5dvh), 2.75rem);
+  font-size: clamp(1.75rem, min(11vw, 8dvh), 4.5rem);
+  color: var(--dd-text-3);
 }
 
 /* HUD chrome, near-zero (SPEC M2-O13). The brand caption is the first thing
@@ -295,6 +312,45 @@ body {
 .dd-hud > header [data-testid='mode-toggle'] button {
   padding-left: 0.75rem;
   padding-right: 0.75rem;
+}
+
+/* Chrome auto-hide (SPEC M2-O14). After 3 s on HUD — or 3 s after the
+   last tap — every chrome row fades out and the two heroes stand alone; a
+   tap anywhere on the root (HudMode's bubbling pointerdown) brings the
+   rows back and restarts the countdown. What hides: the header row
+   (unit switcher + Drive/HUD switch) and the chip row (`.dd-hud-chrome`:
+   stationary chip + FixBanner). What never hides: the mirrored hero
+   container — it carries neither hook, and this rule's selectors can only
+   reach `> header` and `> .dd-hud-chrome` as direct children of the HUD
+   root. Only opacity and visibility move (no translate, no scale), so the
+   rows fade in place: their boxes stay reserved, the heroes never shift
+   and nothing bounces. `visibility` flips instantly on show and one fade
+   late on hide — the row stays hit-testable through the whole fade-out
+   and is out of hit-testing and the a11y tree the moment it is gone.
+   Reduced motion drops the fade below; layout, mirror and data are
+   untouched by this rule. */
+.dd-hud > header,
+.dd-hud > .dd-hud-chrome {
+  transition:
+    opacity 240ms ease,
+    visibility 0s;
+}
+.dd-hud[data-chrome='hidden'] > header,
+.dd-hud[data-chrome='hidden'] > .dd-hud-chrome {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 240ms ease,
+    visibility 0s linear 240ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dd-hud > header,
+  .dd-hud > .dd-hud-chrome,
+  .dd-hud[data-chrome='hidden'] > header,
+  .dd-hud[data-chrome='hidden'] > .dd-hud-chrome {
+    transition: none;
+  }
 }
 
 /* Landscape layout (SPEC M2-O12). The shell owns orientation the way it
@@ -400,15 +456,18 @@ body {
     margin-top: 0;
   }
   /* Height-dominant clamps: width is generous here, height is the scarce
-     axis (360-480 px), so the speed caps at 56dvh and the letter at 40dvh —
-     still under the hero so the speed keeps the largest font on screen. */
+     axis (360-480 px), so the speed caps at 56dvh and the letter at 32dvh —
+     still under the hero so the speed keeps the largest font. M2-O14
+     rebalance applied here too: letter 26vw/40dvh -> 20vw/32dvh
+     (-20 % at 926x412: 164.8 -> 131.84 px), degrees 5vw/9dvh ->
+     8vw/14dvh (+56 %: 37.08 -> 57.68 px), speed untouched at 34vw/56dvh. */
   .dd-hud .dd-readout {
     font-size: clamp(4.5rem, min(34vw, 56dvh), 18rem);
   }
   .dd-hud-heading-letter {
-    font-size: clamp(3rem, min(26vw, 40dvh), 13rem);
+    font-size: clamp(2.5rem, min(20vw, 32dvh), 11rem);
   }
   .dd-hud-heading-deg {
-    font-size: clamp(1.1rem, min(5vw, 9dvh), 2.5rem);
+    font-size: clamp(1.5rem, min(8vw, 14dvh), 4rem);
   }
 }
