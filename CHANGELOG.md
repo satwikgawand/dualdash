@@ -2,6 +2,18 @@
 
 All notable changes to DualDash are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-28 - Build — v1.4 debug APK (full HUD arc: windshield + rebalance + chrome auto-hide), versionCode 5
+
+Release artifact for the two 2026-10-28 HUD entries below (built from master `8d55c6a`: 5f5b6c7 + version-bump commit, tree clean, master == origin).
+
+- **Name:** `dualdash-1.4-debug.apk` — **sha256** `eb6a6e3d3ca48a7b3d4b9585cdd50f7db70464d27d65eae7c1f97bd7d91c5503` (11,444,443 bytes, debug-signed, `com.satwik.dualdash`); staged at `/root/.hermes/cache/scratch/dualdash-1.4-debug.apk` (same sha).
+- **Version:** versionCode **4 → 5**, versionName **"1.3" → "1.4"** (`android/app/build.gradle`); `package.json` synced **"0.1.0" → "1.4"** in the same bump commit (it lagged every gradle bump since M2). aapt badging on the APK reads `versionCode='5' versionName='1.4'`; launcher `icon='res/mipmap-anydpi-v26/ic_launcher.xml'` non-empty.
+- **FULL_SENSOR survived the arc:** `aapt dump xmltree <apk> AndroidManifest.xml | grep screenOrientation` → `A: android:screenOrientation(0x0101001e)=(type 0x10)0xa`. aapt prints the enum as an int: **0xa = 10 = `SCREEN_ORIENTATION_FULL_SENSOR`** — same enum as the v1.3 proof, proven inside the compiled APK.
+- **Bundle match:** embedded `assets/public/assets/index-BCq3fTyD.js` sha `8a9c35eb5832fe49fc9cb61269d7e437eac6eafcbe5360cebc6c9f8537f729c6` (284,333 bytes) is byte-identical to fresh `dist` (`cmp` clean); embedded `index-CdNgEQ9g.css` sha `e67251a06f6675c7aac717f9996176c0ab3bcdb5957c0936bbe6821d610775ba` (21,522 bytes) likewise byte-identical.
+- **HUD markers (grepped inside the shipped assets, not source).** Embedded JS: `"hud-mirror"` 1, `"scaleX(-1)"` 1, `dd-hud-chrome` 1, `data-chrome` 1. `CHROME_IDLE_MS`/`hudChrome` are renamed by the minifier — the value ships as `const qS=3e3` wired to the timer setter (4 × `3e3` in the bundle) and the embedded sourcemap carries `CHROME_IDLE_MS` 3 / `hudChrome` 3 / `createChromeAutoHide` 4. Embedded CSS: `--dd-text-3:#8b8b96` in the token block (9 token uses), `.dd-hud .dd-readout{font-size:clamp(4.75rem,min(44vw,27dvh),20rem)}`, `.dd-hud-heading-letter{color:var(--dd-text-3);font-size:clamp(3rem,min(34vw,20dvh),13rem)}`, `.dd-hud-heading-deg{color:var(--dd-text-3);font-size:clamp(1.75rem,min(11vw,8dvh),4.5rem)}` (plus both landscape overrides).
+- **Plugins/config:** all 3 plugin classes present across the 8 dex files (KeepAwakePlugin, GeolocationPlugin, HapticsPlugin); embedded `assets/capacitor.plugins.json` lists keep-awake 6.0.0, geolocation 8.2.4, haptics 8.0.2; embedded `capacitor.config.json` has SystemBars `hidden:true, style:DARK, insetsHandling:css, initialViewportFitValueHint:cover`.
+- **Toolchain/gates:** JDK 21, Android SDK build-tools 36.0.0. `npx vitest run` **367/367**; `npm run build` (tsc -b + vite), standalone `npx tsc -b`, `npx cap sync` (3 plugins listed), ElementTree manifest parse and `./gradlew assembleDebug` all exit 0 (BUILD SUCCESSFUL in 37 s).
+
 ## 2026-10-28 - Added — HUD direction-pair rebalance (smaller muted letter, bigger muted degrees) + 3 s chrome auto-hide with tap-restore (SPEC M2-O14)
 
 Owner request (card t_991c04d9, verbatim after device-testing the windshield build): "Yep, seems good, but we can make the direction a bit smaller and the heading degree a bit bigger and use muted color for both of those. And let's hide everything else on the screen after 3 seconds. A tap brings all those options back on the screen."
