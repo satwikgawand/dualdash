@@ -37,7 +37,9 @@ from repos `banana-scale`, `ebook-reader`, `kata`, `portfolio`.
 - Web frontends: React + TypeScript.
 - Database: Turso by default; Supabase when production/auth needs it.
 - Hosting: Vercel.
-- Android: PWA + Capacitor, never a native rewrite.
+- Android: PWA + Capacitor is the DEFAULT. Native Kotlin/Compose is allowed when the app needs it
+  (camera, sensors, performance-critical) — precedent: kata, dualdash. State the exception in that
+  repo's AGENTS.md; never assume native without it.
 - Tailwind where the repo already uses it; never introduce a second CSS system. *(owner convention)*
 
 ## Secrets
