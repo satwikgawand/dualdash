@@ -2,6 +2,9 @@
 
 All notable changes to DualDash are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-28 - docs: fleet STANDARDS.md + AGENTS.md adopted (standards rollout)
+
+- Done: standards adopted; AGENTS slots filled from real repo facts.
 ## [Unreleased]
 
 ### Added — landscape support: orientation unlocked, Drive + HUD correct in both orientations, side insets (SPEC M2-O12, 2026-10-27)
@@ -272,6 +275,3 @@ Card t_77d88d1e: build the tape-direction-fix debug APK from master and hand the
 - **Seam-fix marker proofs (verified inside the APK).** Minified identifiers are stripped from the JS, so the markers were grepped in the embedded sourcemap (`grep -c` on `index-81HsqFOF.js.map` extracted from the APK): `TAPE_SAFE_BAND_PX` ×4, `foldTranslateX` ×5, `TAPE_COPY_PX` ×2, `tapeTranslateX` ×5, and the seam-fix rationale comment `nearest-copy` ×1 ("the CSS follow transition animates the *numeric* transform, not the wrapped heading … makes the raw transform jump a whole copy width whenever the heading wraps through north"). Grep of the embedded JS itself: 0 hits for the identifiers (expected — minified) but the compiled `orientation:` overlay label IS in the JS as the JSX children array `["orientation:", " ", …]` (`orientation:` ×3 in the bundle); DEBUG_GATE ×6 in the sourcemap. (4) `assets/capacitor.config.json` keeps the `SystemBars` config (`hidden: true`, `style: "DARK"`, `insetsHandling: "css"`, `initialViewportFitValueHint: "cover"`). (5) `assets/capacitor.plugins.json` lists exactly three plugins — `@capacitor-community/keep-awake@6.0.0`, `@capacitor/geolocation@8.2.4`, `@capacitor/haptics@8.0.2` — same three `cap sync` logged; native classes confirmed by binary grep of `classes*.dex` (KeepAwake classes2.dex ×10, GeolocationPlugin classes6.dex ×48, HapticsPlugin classes3.dex ×3).
 - **Pipeline exit codes.** `git pull --ff-only` 0 (already at `84fabbb`), `npm ci` 0, `npm run build` 0, `npm run cap:sync` 0 (3 plugins), `./gradlew assembleDebug` 0 (BUILD SUCCESSFUL in 31s).
 
-## 2026-10-28 - docs: fleet STANDARDS.md + AGENTS.md adopted (standards rollout)
-
-- Done: standards adopted; AGENTS slots filled from real repo facts.
