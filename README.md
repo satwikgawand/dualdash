@@ -58,11 +58,11 @@ npx tsc -b                  # standalone typecheck
 npx cap sync                # copy web assets + plugin config into android/
 ```
 
-Then build the APK (this repo's build machine paths):
+Then build the APK. Set `JAVA_HOME` to a JDK 21 install and `ANDROID_HOME` to your Android SDK. Replace the placeholder paths below with your own paths:
 
 ```bash
-export JAVA_HOME=/root/tools/jdk-21
-export ANDROID_HOME=/root/Android/Sdk
+export JAVA_HOME=/path/to/jdk-21         # your JDK 21 install
+export ANDROID_HOME=/path/to/android-sdk # your Android SDK
 cd android
 ./gradlew assembleDebug     # output: app/build/outputs/apk/debug/app-debug.apk
 ```
