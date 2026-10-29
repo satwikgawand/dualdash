@@ -35,3 +35,15 @@ npm-debug.log*
 # Env
 .env
 .env.local
+
+# Secrets
+google-services.json
+*.keystore
+*.jks
+*.p12
+*.pem
+.env.*
+
+# Agent docs (kept local, not shipped)
+AGENTS.md
+STANDARDS.md
