@@ -16,6 +16,7 @@ Security-driven bump from a dependency audit.
 ## 2026-10-29 - Docs
 
 - 2026-10-29: docs scrubbed for public release (internal paths/card IDs removed).
+- 2026-10-29: repository flipped public. Release v1.4: <https://github.com/satwikgawand/dualdash/releases/tag/v1.4> — APK `dualdash-1.4.apk` (11,444,443 bytes, sha256 `eb6a6e3d3ca48a7b3d4b9585cdd50f7db70464d27d65eae7c1f97bd7d91c5503`) plus three HUD screenshots. The launcher icon is unchanged: still the stock Capacitor adaptive icon (`res/mipmap-anydpi-v26/ic_launcher.xml`) — pre-existing, not part of this flip.
 
 ## 2026-10-28 - Build — v1.4 debug APK (full HUD arc: windshield + rebalance + chrome auto-hide), versionCode 5
 

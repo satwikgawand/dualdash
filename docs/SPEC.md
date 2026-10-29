@@ -12,6 +12,8 @@ Problem it solves: factory speedometers read in km/h or mph units the driver mus
 
 Phase: **Milestone 1 — drive-testable speed HUD.** Application code exists and builds; not yet drive-tested on a device.
 
+Public repository since 2026-10-29: <https://github.com/satwikgawand/dualdash> (MIT). First public release is v1.4 — <https://github.com/satwikgawand/dualdash/releases/tag/v1.4>. The launcher icon is still the stock Capacitor adaptive icon — pre-existing, unchanged by the flip.
+
 Completed in M1 (2026-10-25):
 
 - Scaffold: Vite + React + TypeScript + Tailwind (house stack), PWA manifest, Capacitor 8 Android shell, app id `com.satwik.dualdash`. `npx cap sync` exits clean.
