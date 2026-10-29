@@ -4,7 +4,7 @@ All notable changes to DualDash are documented here. Format follows [Keep a Chan
 
 ## 2026-10-29 - Dependencies — vitest 3 → 5 (clears both critical advisories)
 
-Security-driven bump from audit t_89c13155. Dev tooling only; no app-code, test, or assertion changes.
+Security-driven bump from a dependency audit.
 
 - **vitest `^3.0.0` → `^5.0.5`** (latest stable). `npm audit` **before: 6 total — 2 critical, 4 moderate; after: 3 total — 0 critical, 3 moderate.** Both criticals cleared: GHSA-82fw-gwwq-j7x9 (vitest path traversal via @vitest/mocker redirect mock) and GHSA-5gmw-xhrv-c9v3 + GHSA-85c8-ppgw-ccpr (tinypool prototype-pollution RCE gadgets). Structural reason: vitest 5 **dropped tinypool from its dependency tree entirely** and no longer ships the vulnerable @vitest/mocker 3.x line — only `@vitest/mocker` 5.0.5 remains as a separate package, and the advisory-tracked @vitest/* internals (expect/runner/snapshot/spy/utils/pretty-format) are bundled inside the vitest package.
 - **Peer resolution: vite stays `^6.0.0` — no major forced.** vitest 5 requires vite `^6.4.0 || ^7.0.0 || ^8.0.0`; the lockfile already resolves **vite 6.4.5**, which satisfies the range as-is. `npm ls vite vitest` clean, no `--force`, no peer overrides.
@@ -55,8 +55,7 @@ Owner request (verbatim): "For the HUD mode, the phones gonna be away and the us
 - **Tests.** 345 → **357 / 357**: new `tests/hudLayout.test.ts` — 12 guards (rose mapping incl. the 337°/338° seam, the HUD clamps, letter-under-hero, the untouched Drive clamp, the landscape side-by-side row plus the layout-only landscape block, suppressed placeholders, no tape/threshold/session/roll imports in HUD, both heroes inside the mirror, compact chrome with a ≥ 44 px mode switch). `npm run build` (tsc -b + vite) green; `git diff origin/master -- src/core` empty.
 - **Owner check:** mount the phone flat, switch to HUD, read the reflection — speed and heading should fill the windshield; km/h ↔ mph and Drive ↔ HUD stay reachable from the one chrome row.
 
-## 2026-10-28 - docs: fleet STANDARDS.md + AGENTS.md adopted (standards rollout)
-
+docs: internal engineering standards adopted (kept out of tree).
 - Done: standards adopted; AGENTS slots filled from real repo facts.
 ## [Unreleased]
 
