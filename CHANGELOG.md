@@ -2,6 +2,17 @@
 
 All notable changes to DualDash are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-29 - Dependencies — vitest 3 → 5 (clears both critical advisories)
+
+Security-driven bump from audit t_89c13155. Dev tooling only; no app-code, test, or assertion changes.
+
+- **vitest `^3.0.0` → `^5.0.5`** (latest stable). `npm audit` **before: 6 total — 2 critical, 4 moderate; after: 3 total — 0 critical, 3 moderate.** Both criticals cleared: GHSA-82fw-gwwq-j7x9 (vitest path traversal via @vitest/mocker redirect mock) and GHSA-5gmw-xhrv-c9v3 + GHSA-85c8-ppgw-ccpr (tinypool prototype-pollution RCE gadgets). Structural reason: vitest 5 **dropped tinypool from its dependency tree entirely** and no longer ships the vulnerable @vitest/mocker 3.x line — only `@vitest/mocker` 5.0.5 remains as a separate package, and the advisory-tracked @vitest/* internals (expect/runner/snapshot/spy/utils/pretty-format) are bundled inside the vitest package.
+- **Peer resolution: vite stays `^6.0.0` — no major forced.** vitest 5 requires vite `^6.4.0 || ^7.0.0 || ^8.0.0`; the lockfile already resolves **vite 6.4.5**, which satisfies the range as-is. `npm ls vite vitest` clean, no `--force`, no peer overrides.
+- **tsconfig `types` now `["vite/client", "node"]`.** vitest 3's type tree loaded `@types/node` transitively into the program, which is what let `tests/hudLayout.test.ts` and `tests/orientationLayout.test.ts` typecheck their `node:fs` / `node:path` / `process` usage under `moduleResolution: "bundler"` (where `node:` specifiers resolve only through `@types/node`'s ambient module declarations). vitest 5's rewritten type tree no longer pulls those types in, so `npx tsc -b` failed with TS2307/TS2591 after the bump. Listing `"node"` explicitly fixes it durably instead of riding a transitive load; runtime behavior is untouched.
+- **Suite: 367/367 passed (19 files) before AND after — zero delta**, no test file touched, no assertion weakened. `npx tsc -b` exit 0, `npm run build` (tsc -b + vite) exit 0.
+- **Residual moderates (3), all transitive behind `@capacitor/cli` 8.5.3, not vitest:** `xcode` 3.0.1 → `uuid` 7.0.3 (GHSA-w5hq-g745-h8pq, buffer bounds check in v3/v5/v6 with `buf`). Prod dependency surface remains 0 advisories. `npm audit` reports a non-breaking fix path (likely a newer `@capacitor/cli` 8.x) — left for a Capacitor-tooling card, since moving the CLI changes `cap sync` behavior that this card does not gate.
+- Lockfile real update (`npm install --save-dev vitest@^5.0.5`), no `--no-save` tricks; `package.json`, `package-lock.json`, `tsconfig.json` + this entry are the whole diff.
+
 ## 2026-10-29 - Docs
 
 - 2026-10-29: docs scrubbed for public release (internal paths/card IDs removed).
